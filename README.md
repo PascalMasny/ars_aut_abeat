@@ -1,9 +1,19 @@
 # Vallis Simulacri
 ### *The Valley of Likeness* — An Interactive Gallery Installation
 
-**Vallis Simulacri** is a real-time interactive art installation that studies the *uncanny valley* — the psychological phenomenon where a representation of a human figure that is *almost* convincingly real triggers an involuntary sense of unease, revulsion, or dread.
+> *At what point does a human find their own species wrong?*
 
-Visitors stand before a screen showing a classical artwork. By raising both hands they initiate a 30-second session: the image visibly degrades through AI-driven distortion while MediaPipe facial analysis silently records the visitor's emotional response at 10 Hz. At the end of the session a wax-seal verdict in Latin is rendered:
+**Vallis Simulacri** takes classical paintings and sculptures of the human figure and feeds them into an AI — then feeds the output back in again, one hundred times. Each cycle the image drifts further from the original. Features smooth. Proportions shift. Something that was familiar becomes wrong.
+
+The visitor watches this happen. Their face is read throughout, silently, at ten frames per second. The micro-expressions they cannot control — the involuntary flickers of disgust and fear — are recorded and scored. At the end, a verdict is rendered.
+
+The installation is not about AI. It is about the human nervous system: its extraordinary sensitivity to the human body, and the precise moment that sensitivity becomes alarm. The AI is just the instrument. The subject is *you*.
+
+See [`docs/CONCEPT.md`](docs/CONCEPT.md) for the full philosophical framing.
+
+---
+
+Visitors stand before a screen showing a classical artwork. By raising both hands they initiate a 30-second session: the image morphs through AI-driven distortion while MediaPipe facial analysis silently records their emotional response at 10 Hz. At the end a wax-seal verdict in Latin is rendered:
 
 | Verdict | Latin meaning | Score |
 |---------|--------------|-------|
@@ -124,6 +134,7 @@ Both scripts are fully resumable — interrupted runs continue from where they s
 
 ## Documentation
 
+- [`docs/CONCEPT.md`](docs/CONCEPT.md) — Philosophy, core idea, and what the installation sets out to achieve
 - [`ars_aut_abeat/README.md`](ars_aut_abeat/README.md) — Full gallery app reference (architecture, config, installation, DB schema)
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — System design, threading model, emotion scoring
 - [`docs/PIPELINE.md`](docs/PIPELINE.md) — Preprocessing pipeline, degradation algorithm, LLaVA integration
