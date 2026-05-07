@@ -15,6 +15,7 @@ No API key required. All images are public domain.
 import time
 import pathlib
 import requests
+from typing import Optional
 
 CATALOG_DIR = pathlib.Path(__file__).parent / "catalog"
 API_BASE    = "https://collectionapi.metmuseum.org/public/collection/v1"
@@ -84,7 +85,7 @@ def search_objects(q: str, dept: int) -> list[int]:
     return resp.json().get("objectIDs") or []
 
 
-def fetch_object(object_id: int) -> dict | None:
+def fetch_object(object_id: int) -> Optional[dict]:
     resp = requests.get(f"{API_BASE}/objects/{object_id}", timeout=15)
     resp.raise_for_status()
     obj  = resp.json()

@@ -35,6 +35,7 @@ import pathlib
 import threading
 import argparse
 import concurrent.futures
+from typing import Optional
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
 
@@ -182,7 +183,7 @@ def main():
         if start_iter > 1:
             print(f"  Resuming from iteration {start_iter - 1}")
 
-        ema_sec: float | None = None
+        ema_sec: Optional[float] = None
         t0 = time.perf_counter()
 
         for i in range(start_iter, ITERATIONS + 1):
