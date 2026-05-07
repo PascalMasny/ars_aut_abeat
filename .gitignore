@@ -1,0 +1,56 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Runtime database (created on first run)
+data/gallery.db
+data/*.db
+*.log
+
+# Generated image sequences — up to 100 frames per artwork, can exceed 10 GB
+uncanny_maker/catalog_iterations/
+uncanny_maker/catalog_uncanny/
+_prototypes/proto_frames/
+
+# Source artwork images — 400+ MB, re-downloadable via download_human_figures.py
+uncanny_maker/catalog/*.jpg
+uncanny_maker/catalog/*.jpeg
+uncanny_maker/catalog/*.png
+
+# MediaPipe model files downloaded automatically on first run
+*.task
+*.tflite
+
+# Stable Diffusion model cache (handled by Hugging Face hub)
+.cache/
+
+# Streamlit secrets (never commit credentials)
+.streamlit/secrets.toml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+.env
+
+# Claude Code internal config
+.claude/
