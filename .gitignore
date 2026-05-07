@@ -29,6 +29,8 @@ data/*.db
 uncanny_maker/catalog_iterations/
 uncanny_maker/catalog_uncanny/
 uncanny_maker/_archive/catalog_iterations_wrong/
+uncanny_maker/_archive/catalog_uncanny/
+uncanny_maker/_archive/catalog_others/
 _prototypes/proto_frames/
 
 # Source artwork images — 400+ MB, re-downloadable via download_human_figures.py
