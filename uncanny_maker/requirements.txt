@@ -1,0 +1,7 @@
+streamlit>=1.32
+diffusers>=0.27
+torch>=2.1
+transformers>=4.38
+accelerate>=0.27
+Pillow>=10
+requests>=2.31

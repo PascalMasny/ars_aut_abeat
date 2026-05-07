@@ -1,0 +1,2 @@
+# Images are excluded from version control (~400 MB).
+# Run download_human_figures.py to populate this directory.
