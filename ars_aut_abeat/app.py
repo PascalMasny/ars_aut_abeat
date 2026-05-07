@@ -245,7 +245,77 @@ if phase == "IDLE":
     </div>
   </div>
 
-  <aside class="howitworks-panel"><div class="howitworks-title">THE EXPERIENCE</div><div class="howitworks-step" style="margin-bottom:0.6rem;line-height:1.6;">A classical artwork is presented to you — then fed into an AI. The AI output is fed back in again. And again. Each cycle pushes the image further into the uncanny valley: recognisable, yet deeply wrong.</div><div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.6rem 0;"></div><div class="howitworks-step"><strong>I.</strong>A classical work appears before you</div><div class="howitworks-step"><strong>II.</strong>It slowly morphs through AI feedback loops</div><div class="howitworks-step"><strong>III.</strong>Your emotional response is recorded in real time</div><div class="howitworks-step"><strong>IV.</strong>A graph of your descent is revealed</div><div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.6rem 0;"></div><div style="background:rgba(139,34,34,0.18);border:1px solid rgba(139,34,34,0.5);border-radius:4px;padding:0.5rem 0.7rem;"><div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.85vw,0.85rem);letter-spacing:0.15em;color:#CC6666;margin-bottom:0.25rem;">&#9888; CONTENT WARNING</div><div class="howitworks-step" style="color:#E0B0B0;margin:0;">Some images may appear disturbing due to uncanny distortion. Raise both hands to acknowledge and begin.</div></div></aside>
+  <aside class="howitworks-panel">
+
+    <div class="howitworks-title">VALLIS SIMULACRI</div>
+    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
+                font-size:clamp(0.8rem,0.95vw,1rem);color:#8B6F2E;
+                text-align:center;letter-spacing:0.1em;margin-bottom:0.7rem;">
+      The Valley of Likeness
+    </div>
+
+    <div class="howitworks-step" style="line-height:1.65;margin-bottom:0.7rem;">
+      In 1970, roboticist Masahiro Mori described the <em>uncanny valley</em>:
+      as a human likeness grows more realistic, our sense of familiarity rises —
+      until it crosses a threshold and plunges into revulsion. Almost human
+      is worse than not human at all.
+    </div>
+
+    <div class="howitworks-step" style="line-height:1.65;margin-bottom:0.8rem;">
+      This installation tests that threshold. A classical artwork is fed into
+      an AI, whose output is fed back in — again and again. Each cycle the
+      image drifts further from the original. Your face is read throughout.
+    </div>
+
+    <div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.6rem 0 0.7rem;"></div>
+
+    <div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.78vw,0.8rem);
+                letter-spacing:0.18em;color:#C9A961;margin-bottom:0.5rem;">
+      WHAT WILL HAPPEN
+    </div>
+    <div class="howitworks-step"><strong>I.</strong> A classical work appears before you</div>
+    <div class="howitworks-step"><strong>II.</strong> It morphs through 100 AI feedback loops over 30 seconds</div>
+    <div class="howitworks-step"><strong>III.</strong> Your facial micro-expressions are analysed in real time</div>
+    <div class="howitworks-step"><strong>IV.</strong> A Latin verdict and your emotional descent are revealed</div>
+
+    <div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.75rem 0 0.6rem;"></div>
+
+    <div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.78vw,0.8rem);
+                letter-spacing:0.18em;color:#C9A961;margin-bottom:0.5rem;">
+      TO BEGIN
+    </div>
+    <div class="howitworks-step" style="line-height:1.6;">
+      Stand within arm's reach of the screen.
+      When you are ready, <strong style="color:#E8C87A;">raise both hands</strong>
+      above your shoulders and hold them there for two seconds.
+      The experience lasts approximately one minute.
+    </div>
+
+    <div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.75rem 0 0.6rem;"></div>
+
+    <div style="font-family:'Cinzel',serif;font-size:clamp(0.55rem,0.72vw,0.75rem);
+                letter-spacing:0.15em;color:#8B6F2E;margin-bottom:0.35rem;">
+      PRIVACY
+    </div>
+    <div class="howitworks-step" style="font-size:clamp(0.75rem,0.9vw,0.95rem);line-height:1.5;color:#8B9070;">
+      No video is recorded or stored. Emotion analysis runs locally on this
+      device. Only an anonymous score and aggregate statistics are saved.
+    </div>
+
+    <div style="background:rgba(139,34,34,0.18);border:1px solid rgba(139,34,34,0.45);
+                border-radius:4px;padding:0.5rem 0.7rem;margin-top:0.65rem;">
+      <div style="font-family:'Cinzel',serif;font-size:clamp(0.55rem,0.75vw,0.78rem);
+                  letter-spacing:0.15em;color:#CC6666;margin-bottom:0.25rem;">
+        &#9888; CONTENT WARNING
+      </div>
+      <div class="howitworks-step" style="color:#E0B0B0;margin:0;
+                  font-size:clamp(0.75rem,0.9vw,0.95rem);line-height:1.5;">
+        Images become progressively distorted. Some viewers find the results
+        unsettling. Raising both hands constitutes your consent to participate.
+      </div>
+    </div>
+
+  </aside>
 
   <!-- Bottom: status + plaque -->
   <div class="mirror-bottom">
