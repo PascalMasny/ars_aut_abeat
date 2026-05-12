@@ -1,5 +1,5 @@
 import json
-from config import VERDICT_ARS_THRESHOLD, VERDICT_ABEAT_THRESHOLD, EMOTION_LATIN
+from config import VERDICT_VALLIS_THRESHOLD, VERDICT_FIRMA_THRESHOLD, EMOTION_LATIN
 from data.stats import artwork_summary, concordance, _score
 from data.models import Viewing
 from vision.emotion import dominant_emotion
@@ -13,9 +13,9 @@ def verdict_label(score: float) -> str:
     # VALLIS — fell into the uncanny valley (high disgust/fear)
     # LIMEN  — on the threshold (mixed / unsure)
     # FIRMA  — stable ground, unaffected by the likeness
-    if score >= VERDICT_ARS_THRESHOLD:
+    if score >= VERDICT_VALLIS_THRESHOLD:
         return "VALLIS"
-    elif score >= VERDICT_ABEAT_THRESHOLD:
+    elif score >= VERDICT_FIRMA_THRESHOLD:
         return "LIMEN"
     return "FIRMA"
 

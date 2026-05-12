@@ -3,24 +3,26 @@ from pathlib import Path
 BASE_DIR = Path(__file__).parent
 
 # Timing (seconds)
-LOCK_STABILITY_DURATION   = 1.5
+LOCK_STABILITY_DURATION    = 1.5
 LOCKED_TRANSITION_DURATION = 2.5
-INTRO_DURATION            = 8.0
-MORPHING_DURATION         = 30.0
-RECAP_DURATION            = 15.0
-FADE_DURATION             = 3.0
-SCREENSAVER_IDLE_TIMEOUT  = 60.0
+INTRO_DURATION             = 8.0
+MORPHING_DURATION          = 30.0
+RECAP_DURATION             = 15.0
+FADE_DURATION              = 3.0
 
-# Morphing: paths to uncanny image sets
+# Source artwork + iteration directories (one level up, in the uncanny_maker
+# pipeline output). The Streamlit static-serving symlink ars_aut_abeat/static/
+# frames points to UNCANNY_OG_DIR.parent / "catalog_iterations".
 _UNCANNY_ROOT  = BASE_DIR.parent / "uncanny_maker"
 UNCANNY_OG_DIR = _UNCANNY_ROOT / "catalog"
+# Legacy 4-stage fallback dirs (catalog/manager.py uses them if a full 100-
+# frame iteration set is missing for an artwork):
 UNCANNY_20_DIR = _UNCANNY_ROOT / "catalog_uncanny" / "20"
 UNCANNY_60_DIR = _UNCANNY_ROOT / "catalog_uncanny" / "60"
 UNCANNY_80_DIR = _UNCANNY_ROOT / "catalog_uncanny" / "80"
 
-# 100-frame animation
-FRAME_COUNT = 100   # degradation frames (0001–0100; 0000 = original)
-FRAME_RATE  = 3.0   # frames per second during playback
+# Animation
+FRAME_COUNT = 100   # 0000 = original + 0001…0100 = degradation frames
 
 # Vision
 EMOTION_SAMPLE_RATE_HZ    = 10
@@ -45,15 +47,9 @@ VERDICT_FIRMA_THRESHOLD  = 0.40
 ATTRACT_CYCLE_S    = 30   # total cycle length in seconds
 ATTRACT_DURATION_S = 15   # how long the attract screen stays visible per cycle
 
-# Back-compat aliases
-VERDICT_ARS_THRESHOLD   = VERDICT_VALLIS_THRESHOLD
-VERDICT_ABEAT_THRESHOLD = VERDICT_FIRMA_THRESHOLD
-
 # Paths
 DB_PATH      = BASE_DIR / "data" / "gallery.db"
-CATALOG_PATH = BASE_DIR / "catalog" / "artworks.json"  # kept for back-compat
-ARTWORKS_DIR = BASE_DIR / "catalog" / "artworks"
-STATIC_DIR   = BASE_DIR / "ui" / "static"
+CATALOG_PATH = BASE_DIR / "catalog" / "artworks.json"  # initial seed data
 
 # Latin emotion names
 EMOTION_LATIN = {

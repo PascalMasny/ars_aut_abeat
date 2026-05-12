@@ -42,9 +42,8 @@ from catalog.manager import get_catalog_manager
 from vision.camera import GalleryVideoProcessor, CameraState
 from data.models import Viewing
 from config import (
-    BASE_DIR,
     MORPHING_DURATION, RECAP_DURATION,
-    FRAME_COUNT, FRAME_RATE,
+    FRAME_COUNT,
     EMOTION_LATIN,
     ATTRACT_CYCLE_S, ATTRACT_DURATION_S,
 )
@@ -61,28 +60,6 @@ inject_css()
 init_db()
 init_state()
 catalog = get_catalog_manager()
-
-
-@st.cache_data(show_spinner=False)
-def _artwork_data_uri(path_str: str) -> str:
-    p = Path(path_str)
-    if not p.exists():
-        return ""
-    ext = p.suffix.lstrip(".") or "jpg"
-    return f"data:image/{ext};base64,{base64.b64encode(p.read_bytes()).decode()}"
-
-
-def _morph_frame_idx(elapsed_t: float, total_frames: int) -> tuple[int, int, float]:
-    """Return (cur_idx, next_idx, blend) for elapsed time.
-
-    blend=0.0 → show only cur; blend=1.0 → show only next.
-    """
-    progress = min(elapsed_t / MORPHING_DURATION, 1.0)
-    raw      = progress * total_frames
-    cur_idx  = min(int(raw), total_frames - 1)
-    next_idx = min(cur_idx + 1, total_frames)
-    blend    = raw - int(raw)
-    return cur_idx, next_idx, blend
 
 
 def _morphing_player_html(stem: str, total_frames: int, duration: float,
