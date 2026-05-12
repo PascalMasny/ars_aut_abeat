@@ -32,6 +32,7 @@ def _sso_stop_safe(self, timeout: float = 1.0) -> None:
     self._polling_thread = None
 _SSO.stop = _sso_stop_safe
 
+import streamlit.components.v1 as components
 from streamlit_webrtc import webrtc_streamer, WebRtcMode
 
 from ui.theme import inject_css
@@ -39,11 +40,13 @@ from core.state_machine import init_state, advance_state, PHASES
 from data.db import init_db, get_session
 from catalog.manager import get_catalog_manager
 from vision.camera import GalleryVideoProcessor, CameraState
+from data.models import Viewing
 from config import (
     BASE_DIR,
     MORPHING_DURATION, RECAP_DURATION,
     FRAME_COUNT, FRAME_RATE,
     EMOTION_LATIN,
+    ATTRACT_CYCLE_S, ATTRACT_DURATION_S,
 )
 
 # ─── Page config ──────────────────────────────────────────────────────────────
@@ -80,6 +83,133 @@ def _morph_frame_idx(elapsed_t: float, total_frames: int) -> tuple[int, int, flo
     next_idx = min(cur_idx + 1, total_frames)
     blend    = raw - int(raw)
     return cur_idx, next_idx, blend
+
+
+def _morphing_player_html(stem: str, total_frames: int, duration: float,
+                           phase_start: float, title: str) -> str:
+    import json
+    return f"""<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Cormorant+Garamond:ital,wght@0,400;1,400&display=swap" rel="stylesheet">
+<style>
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+html, body {{ background: #1C1410; overflow: hidden; width: 100vw; height: 100vh; }}
+#player {{
+    position: fixed;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: 100vh;
+    background: #1C1410;
+    overflow: hidden;
+}}
+#img-a, #img-b {{
+    position: absolute; top: 0; left: 0;
+    width: 100%; height: 100%;
+    object-fit: contain;
+}}
+#img-b {{ opacity: 0; }}
+#frame-border {{
+    position: absolute; top: 8px; left: 8px; right: 8px; bottom: 8px;
+    border: 3px solid #C9A961;
+    box-shadow: 0 0 0 1px #8B6F2E, inset 0 0 0 1px #8B6F2E,
+                0 0 30px rgba(201,169,97,0.15), inset 0 0 30px rgba(201,169,97,0.08);
+    pointer-events: none; z-index: 10;
+}}
+#top-overlay {{
+    position: absolute; top: 0; left: 0; right: 0; z-index: 5;
+    background: linear-gradient(rgba(28,20,16,0.85) 0%, transparent 100%);
+    padding: 2.5vh 4vw 5vh; text-align: center;
+}}
+.artwork-title {{
+    font-family: 'Cinzel', serif; font-weight: 700;
+    font-size: clamp(1.1rem, 3vw, 2.2rem);
+    letter-spacing: 0.15em; color: #C9A961;
+}}
+.frame-label {{
+    font-family: 'Cormorant Garamond', serif; font-style: italic;
+    font-size: clamp(0.85rem, 1.2vw, 1.2rem);
+    letter-spacing: 0.25em; color: #8B6F2E; margin-top: 0.3rem;
+}}
+#progress-track {{
+    position: absolute; left: 6vw; right: 6vw; bottom: 1.5vh;
+    height: 2px; background: rgba(201,169,97,0.12);
+    border-radius: 2px; z-index: 5;
+}}
+#progress-fill {{
+    height: 100%;
+    background: linear-gradient(90deg, #8B6F2E, #C9A961);
+    border-radius: 2px;
+}}
+</style>
+</head>
+<body>
+<div id="player">
+  <img id="img-a" />
+  <img id="img-b" />
+  <div id="frame-border"></div>
+  <div id="top-overlay">
+    <div class="artwork-title">{title}</div>
+    <div class="frame-label" id="frame-el">FRAME 000 / {total_frames}</div>
+  </div>
+  <div id="progress-track"><div id="progress-fill" style="width:0%"></div></div>
+</div>
+<script>
+const STEM = {json.dumps(stem)};
+const TOTAL_FRAMES = {total_frames};
+const DURATION = {duration};
+const STARTED_AT = {phase_start};
+
+// Resolve an absolute origin (srcdoc iframes can have a flaky base URL,
+// so we fall back to the parent window's origin if accessible).
+let ORIGIN = "";
+try {{ ORIGIN = window.parent.location.origin; }} catch(e) {{}}
+console.log("[morphing] booting", {{stem: STEM, total: TOTAL_FRAMES, started: STARTED_AT, origin: ORIGIN}});
+
+// Preload all frames
+const imgs = Array.from({{length: TOTAL_FRAMES+1}}, (_,i) => {{
+  const url = ORIGIN + `/app/static/frames/${{STEM}}/${{String(i).padStart(4,'0')}}.png`;
+  const img = new Image();
+  img.onerror = () => console.warn("[morphing] failed", url);
+  img.src = url;
+  return img;
+}});
+console.log("[morphing] preloaded", imgs.length, "frame requests; first url:", imgs[0].src);
+
+// Continuous crossfade: imgA holds the "current" frame, imgB holds the "next".
+// Opacity is interpolated every animation frame from the fractional progress,
+// so neighbouring frames blend smoothly rather than snapping every 0.3 s.
+const imgA = document.getElementById('img-a');
+const imgB = document.getElementById('img-b');
+let curIdx = -1, nextIdx = -1;
+
+function tick() {{
+  const elapsed  = (Date.now()/1000) - STARTED_AT;
+  const progress = Math.min(elapsed/DURATION, 1.0);
+  const raw      = progress * TOTAL_FRAMES;
+  const ci       = Math.min(Math.floor(raw), TOTAL_FRAMES);
+  const ni       = Math.min(ci + 1, TOTAL_FRAMES);
+  const blend    = raw - Math.floor(raw);
+
+  if (ci !== curIdx)  {{ curIdx  = ci;  imgA.src = imgs[ci].src; }}
+  if (ni !== nextIdx) {{ nextIdx = ni;  imgB.src = imgs[ni].src; }}
+
+  imgA.style.opacity = (1 - blend).toFixed(3);
+  imgB.style.opacity = blend.toFixed(3);
+
+  document.getElementById('progress-fill').style.width = (progress*100).toFixed(2) + '%';
+  document.getElementById('frame-el').textContent =
+    'FRAME '+String(ci).padStart(3,'0')+' / '+TOTAL_FRAMES;
+
+  if (progress < 1.0) requestAnimationFrame(tick);
+}}
+tick();
+</script>
+</body>
+</html>"""
 
 
 def _make_recap_graph(timestamps: list[float], samples: list[dict]) -> str:
@@ -124,6 +254,117 @@ def _make_recap_graph(timestamps: list[float], samples: list[dict]) -> str:
     plt.close(fig)
     return base64.b64encode(buf.getvalue()).decode()
 
+def _make_attract_graph(db) -> str | None:
+    """Render aggregate verdict donut + average emotion bars. Returns base64 PNG or None."""
+    import json
+    viewings = db.query(Viewing).all()
+    if not viewings:
+        return None
+
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    import numpy as np
+
+    # ── Aggregate data ────────────────────────────────────────────────────────
+    verdict_counts = {"VALLIS": 0, "LIMEN": 0, "FIRMA": 0}
+    emotion_sums: dict = {}
+    emotion_n = 0
+    for v in viewings:
+        verdict_counts[v.verdict] = verdict_counts.get(v.verdict, 0) + 1
+        try:
+            em = json.loads(v.emotion_json) if isinstance(v.emotion_json, str) else {}
+        except Exception:
+            em = {}
+        if em:
+            for k, val in em.items():
+                emotion_sums[k] = emotion_sums.get(k, 0.0) + val
+            emotion_n += 1
+
+    avg_emotions = {k: v / emotion_n for k, v in emotion_sums.items()} if emotion_n else {}
+
+    # ── Figure ────────────────────────────────────────────────────────────────
+    fig, (ax_donut, ax_bar) = plt.subplots(1, 2, figsize=(13, 5))
+    fig.patch.set_facecolor("#1C1410")
+
+    # Left: verdict donut
+    donut_labels = [k for k, c in verdict_counts.items() if c > 0]
+    donut_sizes  = [verdict_counts[k] for k in donut_labels]
+    donut_colors = {"VALLIS": "#8B2222", "ARS": "#8B2222", "LIMEN": "#6B7B5E", "FIRMA": "#C9A961", "ABEAT": "#C9A961"}
+    colors = [donut_colors.get(k, "#888888") for k in donut_labels]
+
+    if donut_sizes:
+        wedges, texts, autotexts = ax_donut.pie(
+            donut_sizes,
+            labels=None,
+            colors=colors,
+            autopct=lambda p: f"{p:.0f}%" if p > 5 else "",
+            pctdistance=0.75,
+            startangle=90,
+            wedgeprops={"width": 0.55, "edgecolor": "#1C1410", "linewidth": 2},
+        )
+        for at in autotexts:
+            at.set_color("#F4E8D0")
+            at.set_fontsize(9)
+        ax_donut.legend(
+            wedges,
+            [f"{k}  ({verdict_counts[k]})" for k in donut_labels],
+            loc="lower center",
+            facecolor="#1C1410",
+            edgecolor="#3D2810",
+            labelcolor="#C9A961",
+            fontsize=8,
+            framealpha=0.9,
+            ncol=len(donut_labels),
+            bbox_to_anchor=(0.5, -0.08),
+        )
+    else:
+        ax_donut.text(0.5, 0.5, "No data yet", ha="center", va="center",
+                      color="#8B6F2E", fontsize=11, fontfamily="serif",
+                      transform=ax_donut.transAxes)
+
+    ax_donut.set_facecolor("#120E0A")
+    ax_donut.set_title("VERDICT DISTRIBUTION", color="#8B6F2E",
+                        fontsize=8, fontfamily="serif", pad=10)
+
+    # Right: average emotion bars
+    emotion_colors = {
+        "happy": "#E8C87A", "sad": "#6B9E7A", "angry": "#CC5555",
+        "surprise": "#C9A961", "fear": "#9B7FCC", "disgust": "#C97A50",
+        "neutral": "#8B8B7E",
+    }
+    if avg_emotions:
+        sorted_em = sorted(avg_emotions.items(), key=lambda x: x[1], reverse=True)
+        labels = [EMOTION_LATIN.get(k, k.capitalize()) for k, _ in sorted_em]
+        values = [v * 100 for _, v in sorted_em]
+        bar_colors = [emotion_colors.get(k, "#C9A961") for k, _ in sorted_em]
+
+        bars = ax_bar.barh(labels[::-1], values[::-1], color=bar_colors[::-1],
+                           edgecolor="#1C1410", linewidth=0.5, height=0.6)
+        ax_bar.set_xlim(0, 100)
+        ax_bar.set_xlabel("Average Intensity %", color="#8B6F2E", fontsize=8)
+        ax_bar.tick_params(colors="#8B6F2E", labelsize=8)
+        for spine in ax_bar.spines.values():
+            spine.set_color("#3D2810")
+        ax_bar.grid(axis="x", color="#2A1E0A", linewidth=0.6, alpha=0.6)
+    else:
+        ax_bar.text(0.5, 0.5, "No emotion data yet", ha="center", va="center",
+                    color="#8B6F2E", fontsize=11, fontfamily="serif",
+                    transform=ax_bar.transAxes)
+
+    ax_bar.set_facecolor("#120E0A")
+    ax_bar.set_title("AVERAGE EMOTIONAL RESPONSE", color="#8B6F2E",
+                      fontsize=8, fontfamily="serif", pad=10)
+
+    fig.subplots_adjust(wspace=0.35, left=0.08, right=0.97, top=0.88, bottom=0.15)
+
+    buf = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=130, bbox_inches="tight",
+                facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return base64.b64encode(buf.getvalue()).decode()
+
+
 # ─── IDLE header (above camera) ──────────────────────────────────────────────
 phase = st.session_state.get("phase", "IDLE")
 
@@ -147,34 +388,88 @@ zoom_css = f"""<style>
 if zoom_css:
     st.markdown(zoom_css, unsafe_allow_html=True)
 
-# ─── WebRTC camera — always renders, visible in IDLE, covered in other phases ─
-# desired_playing_state=True ONLY on first render; passing it on every rerun causes
-# the component to re-evaluate state and cycle connections.
-_first_render = not st.session_state.get("_webrtc_started", False)
-st.session_state._webrtc_started = True
+# ─── WebRTC camera — SENDONLY: processes frames server-side, never displayed ──
+# The component is rendered with no `desired_playing_state` so the user has to
+# click the built-in START button. That click triggers the browser's camera
+# permission prompt AND its camera-picker dropdown (so iPhone / Continuity
+# Camera / external webcams can be selected). Once frames are flowing, body
+# gets the `camera-running` class and theme.py collapses the component to 0×0.
 
 ctx = webrtc_streamer(
     key="gallery-cam",
-    mode=WebRtcMode.SENDRECV,
-    desired_playing_state=True if _first_render else None,
+    mode=WebRtcMode.SENDONLY,
+    # No desired_playing_state → user clicks the component's own START button.
     video_processor_factory=GalleryVideoProcessor,
     media_stream_constraints={
+        # Low-res stream: face/emotion detection runs on this, never displayed.
+        # 1080p@30fps queued frames faster than the emotion model could clear them.
         "video": {
-            "width":     {"min": 1920, "ideal": 1920},
-            "height":    {"min": 1080, "ideal": 1080},
-            "frameRate": {"min":   15, "ideal":   30},
+            "width":     {"ideal": 640},
+            "height":    {"ideal": 480},
+            "frameRate": {"ideal": 15, "max": 20},
             "facingMode": "user",
         },
         "audio": False,
     },
     async_processing=True,
-    video_html_attrs={
-        "style": {"width": "100%", "height": "100%"},
-        "controls": False,
-        "autoPlay": True,
-        "muted": True,
-    },
 )
+
+# ─── Consent gate: show welcome screen until camera is actually streaming ───
+camera_running = ctx is not None and ctx.state.playing
+if camera_running:
+    # Once frames start flowing, tag <body> so theme.py collapses the picker.
+    components.html(
+        "<script>window.parent.document.body.classList.add('camera-running');</script>",
+        height=0,
+    )
+else:
+    # Make sure the class is OFF while we're showing the picker.
+    components.html(
+        "<script>window.parent.document.body.classList.remove('camera-running');</script>",
+        height=0,
+    )
+    st.markdown("""
+<div class="gallery-overlay" style="flex-direction:column;gap:1.5vh;
+            justify-content:flex-start;padding-top:8vh;">
+  <div style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;
+              border:3px solid #C9A961;
+              box-shadow:0 0 0 1px #8B6F2E,inset 0 0 0 1px #8B6F2E,
+                         0 0 30px rgba(201,169,97,0.15);
+              pointer-events:none;"></div>
+
+  <div style="font-family:'Cinzel',serif;font-weight:700;
+              font-size:clamp(1.4rem,3.5vw,3rem);letter-spacing:0.3em;color:#C9A961;
+              text-shadow:0 3px 18px rgba(0,0,0,0.85);">
+    VALLIS · SIMVLACRI
+  </div>
+  <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
+              font-size:clamp(0.95rem,1.4vw,1.4rem);letter-spacing:0.2em;
+              color:#8B6F2E;margin-top:-0.5vh;">
+    The Valley of Likeness
+  </div>
+
+  <div style="font-family:'Cormorant Garamond',serif;
+              font-size:clamp(1rem,1.5vw,1.4rem);line-height:1.7;
+              color:#E0D0B0;max-width:42rem;text-align:center;margin:2vh 0;">
+    This installation reads your face to measure how you respond to the artwork.
+    <br/>No video is stored. All processing happens on this device.
+  </div>
+
+  <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
+              font-size:clamp(0.95rem,1.3vw,1.25rem);color:#8B6F2E;
+              text-align:center;max-width:36rem;margin:1vh auto 0;">
+    Use the panel below to select your camera and press <b>START</b>.
+    Your browser will ask permission. Once the camera is active this panel
+    disappears and the gallery begins.
+  </div>
+</div>
+""", unsafe_allow_html=True)
+    st.stop()
+
+# Compatibility: code below used to gate on these flags; keep them set so any
+# remaining checks don't trip.
+st.session_state.camera_consent = True
+st.session_state._webrtc_started = True
 
 # ─── Auto-refresh ─────────────────────────────────────────────────────────────
 # Aggressive reruns remount the webrtc iframe and kill the preview. Refresh only
@@ -187,7 +482,8 @@ _phase = st.session_state.get("phase", "IDLE")
 _refresh_ms = {
     "IDLE":     1500,
     "LOCKED":   1000,
-    "MORPHING":  300,   # ~3.3 reruns/s to advance frames at FRAME_RATE=3fps
+    "INTRO":    1500,   # mostly static intro screen
+    "MORPHING":  250,   # JS drives the animation; bar overlay rerenders ~4× / sec
     "RECAP":    5000,   # mostly static after first render
     "FADE":     1000,
 }.get(_phase, 1500)
@@ -211,27 +507,123 @@ finally:
 # Re-read phase (may have changed)
 phase = st.session_state.phase
 
-# ─── IDLE: text overlaid on full-screen video ───────────────────────────────
+# ─── IDLE ────────────────────────────────────────────────────────────────────
 if phase == "IDLE":
-    face = camera_state.face_present
-    hands = camera_state.hands_raised
-    if hands:
-        status_icon = "✦"
-        status_text = "CONSENT ACKNOWLEDGED — HOLD"
-        status_color = "#E8C87A"
-        hint = "Entering the valley…"
-    elif face:
-        status_icon = "◉"
-        status_text = "VISITOR DETECTED"
-        status_color = "#C9A961"
-        hint = "Read the panel. Raise both hands to accept and begin."
-    else:
-        status_icon = "◎"
-        status_text = "APPROACH · BE SEEN"
-        status_color = "#8B6F2E"
-        hint = "Stand before the glass and read the instructions."
+    # ── Attract screen logic ──────────────────────────────────────────────────
+    elapsed_idle  = time.time() - st.session_state.phase_entered_at
+    show_attract  = int(elapsed_idle) % ATTRACT_CYCLE_S < ATTRACT_DURATION_S
 
-    st.markdown(f"""
+    if show_attract:
+        # Rebuild graph only when a new viewing has been logged
+        db_attract = get_session()
+        try:
+            soul_count = db_attract.query(Viewing).count()
+        finally:
+            db_attract.close()
+
+        if soul_count != st.session_state.get("attract_viewing_count"):
+            db_attract2 = get_session()
+            try:
+                st.session_state.attract_graph = _make_attract_graph(db_attract2)
+            finally:
+                db_attract2.close()
+            st.session_state.attract_viewing_count = soul_count
+
+        graph_b64  = st.session_state.get("attract_graph")
+        graph_tag  = (
+            f'<img src="data:image/png;base64,{graph_b64}" '
+            f'style="width:100%;max-height:38vh;height:auto;border-radius:4px;'
+            f'border:1px solid #3D2810;display:block;margin:0.6rem 0;" />'
+            if graph_b64 else
+            '<div style="font-family:\'Cormorant Garamond\',serif;font-style:italic;'
+            'color:#8B6F2E;text-align:center;padding:1.5rem 0;font-size:1.1rem;">'
+            'Awaiting the first soul…</div>'
+        )
+
+        if soul_count == 0:
+            counter_line = (
+                '<div style="font-family:\'Cormorant Garamond\',serif;font-style:italic;'
+                'font-size:clamp(1rem,1.8vw,1.6rem);color:#8B6F2E;text-align:center;'
+                'margin:0.3rem 0;">Be the first to enter</div>'
+            )
+        else:
+            counter_line = (
+                f'<div class="attract-soul-counter">'
+                f'✦ &nbsp; {soul_count} &nbsp; {"SOUL" if soul_count == 1 else "SOULS"} '
+                f'HAVE ENTERED THE VALLEY &nbsp; ✦</div>'
+            )
+
+        st.markdown(f"""
+<div class="attract-overlay">
+  <!-- Title -->
+  <div style="text-align:center;margin-bottom:0.5rem;">
+    <div style="font-family:'Cinzel',serif;font-weight:700;
+                font-size:clamp(1.1rem,2.8vw,2.4rem);letter-spacing:0.25em;color:#C9A961;">
+      VALLIS · SIMVLACRI
+    </div>
+    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
+                font-size:clamp(0.85rem,1.2vw,1.15rem);letter-spacing:0.2em;
+                color:#8B6F2E;margin-top:0.3rem;">
+      The Valley of Likeness
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div style="color:#C9A961;letter-spacing:0.3em;opacity:0.4;font-size:1rem;margin:0.3rem 0;">
+    ❧ · · · ❧
+  </div>
+
+  <!-- Concept blurb -->
+  <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
+              font-size:clamp(0.9rem,1.3vw,1.25rem);color:#E0D0B0;line-height:1.7;
+              text-align:center;max-width:70%;margin:0.4rem auto;">
+    In 1970, roboticist Masahiro Mori described the <em>uncanny valley</em> —
+    the point where a human likeness becomes too real and tips into revulsion.
+    This installation measures your descent in real time.
+  </div>
+
+  <!-- Soul counter -->
+  <div style="margin:0.6rem 0 0.2rem;">
+    {counter_line}
+  </div>
+
+  <!-- Aggregate graph -->
+  {graph_tag}
+
+  <!-- Divider -->
+  <div style="color:#C9A961;letter-spacing:0.3em;opacity:0.4;font-size:1rem;margin:0.3rem 0;">
+    ❧ · · · ❧
+  </div>
+
+  <!-- Call to action -->
+  <div style="font-family:'Cinzel',serif;font-weight:700;
+              font-size:clamp(0.85rem,1.6vw,1.4rem);letter-spacing:0.2em;
+              color:#C9A961;text-align:center;">
+    RAISE BOTH HANDS TO ENTER THE VALLEY
+  </div>
+</div>
+""", unsafe_allow_html=True)
+
+    else:
+        face = camera_state.face_present
+        hands = camera_state.hands_raised
+        if hands:
+            status_icon = "✦"
+            status_text = "CONSENT ACKNOWLEDGED — HOLD"
+            status_color = "#E8C87A"
+            hint = "Entering the valley…"
+        elif face:
+            status_icon = "◉"
+            status_text = "VISITOR DETECTED"
+            status_color = "#C9A961"
+            hint = "Read the panel. Raise both hands to accept and begin."
+        else:
+            status_icon = "◎"
+            status_text = "APPROACH · BE SEEN"
+            status_color = "#8B6F2E"
+            hint = "Stand before the glass and read the instructions."
+
+        st.markdown(f"""
 <div class="mirror-overlay">
   <!-- Top: title -->
   <div class="mirror-top">
@@ -376,57 +768,13 @@ elif phase == "LOCKED":
 </div>
 """, unsafe_allow_html=True)
 
-elif phase == "MORPHING":
-    artwork   = st.session_state.current_artwork
-    elapsed_t = time.time() - st.session_state.phase_entered_at
-    emotions  = camera_state.latest_emotions
-
-    frames       = artwork["frames"]
-    total_frames = len(frames) - 1   # e.g. 100
-
-    cur_idx, next_idx, blend = _morph_frame_idx(elapsed_t, total_frames)
-
-    uri_cur  = _artwork_data_uri(frames[cur_idx])
-    uri_next = _artwork_data_uri(frames[next_idx])
-
-    progress_pct = min(100, int((elapsed_t / MORPHING_DURATION) * 100))
-    frame_label  = f"FRAME {cur_idx:03d} / {total_frames}"
-
-    # ── Build stacked image layers (current + next, blended) ─────────────────
-    img_layers = ""
-    if uri_cur:
-        img_layers += (
-            f'<img src="{uri_cur}" style="position:absolute;top:0;left:0;'
-            f'width:100%;height:100%;object-fit:contain;'
-            f'opacity:{1 - blend:.3f};transition:opacity 0.15s;" />'
-        )
-    if uri_next and uri_next != uri_cur:
-        img_layers += (
-            f'<img src="{uri_next}" style="position:absolute;top:0;left:0;'
-            f'width:100%;height:100%;object-fit:contain;'
-            f'opacity:{blend:.3f};transition:opacity 0.15s;" />'
-        )
-
-    # ── Emotion bars (overlay inside artwork) ────────────────────────────────
-    bars = ""
-    for eng, val in sorted(emotions.items(), key=lambda x: -x[1])[:5]:
-        label_name = EMOTION_LATIN.get(eng, eng.capitalize())
-        pct = round(val * 100, 1)
-        bars += f"""
-<div style="margin:0.3rem 0;">
-  <div style="display:flex;justify-content:space-between;font-family:'Cinzel',serif;
-              font-size:clamp(0.8rem,1.1vw,1.1rem);letter-spacing:0.07em;color:#C9A961;margin-bottom:3px;">
-    <span>{label_name}</span><span>{pct}%</span>
-  </div>
-  <div style="height:clamp(5px,0.8vw,9px);background:rgba(201,169,97,0.15);border-radius:5px;overflow:hidden;">
-    <div style="width:{pct}%;height:100%;background:linear-gradient(90deg,#8B6F2E,#E8C87A);border-radius:5px;transition:width 0.3s;"></div>
-  </div>
-</div>"""
-
+elif phase == "INTRO":
+    artwork = st.session_state.current_artwork
+    base_url = f"/app/static/frames/{artwork['slug']}/0000.png"
     st.markdown(f"""
 <div class="gallery-overlay" style="padding:0;">
-  <!-- Fullscreen image stack -->
-  {img_layers if img_layers else '<div style="position:absolute;top:0;left:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#8B6F2E;">[ IMAGE AWAITED ]</div>'}
+  <img src="{base_url}" style="position:absolute;top:0;left:0;width:100%;height:100%;
+                                object-fit:contain;z-index:1;" />
 
   <!-- Gilt frame border -->
   <div style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;
@@ -435,35 +783,93 @@ elif phase == "MORPHING":
                          0 0 30px rgba(201,169,97,0.15),inset 0 0 30px rgba(201,169,97,0.08);
               pointer-events:none;z-index:10;"></div>
 
-  <!-- Top overlay: title + frame counter -->
+  <!-- Top: title -->
   <div style="position:absolute;top:0;left:0;right:0;z-index:5;
-              background:linear-gradient(rgba(28,20,16,0.85) 0%,transparent 100%);
-              padding:2.5vh 4vw 5vh;text-align:center;">
-    <div style="font-family:'Cinzel',serif;font-weight:700;
-                font-size:clamp(1.1rem,3vw,2.2rem);letter-spacing:0.15em;color:#C9A961;">
-      {artwork['title']}
-    </div>
+              background:linear-gradient(rgba(28,20,16,0.92) 0%,rgba(28,20,16,0.55) 70%,transparent 100%);
+              padding:3vh 4vw 6vh;text-align:center;">
     <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
-                font-size:clamp(0.85rem,1.2vw,1.2rem);letter-spacing:0.25em;
-                color:#8B6F2E;margin-top:0.3rem;">
-      {frame_label}
+                font-size:clamp(0.85rem,1.3vw,1.25rem);letter-spacing:0.3em;
+                color:#8B6F2E;margin-bottom:0.6rem;">
+      THIS IS
+    </div>
+    <div style="font-family:'Cinzel',serif;font-weight:700;
+                font-size:clamp(1.3rem,3.5vw,2.8rem);letter-spacing:0.15em;color:#E8C87A;
+                text-shadow:0 3px 18px rgba(0,0,0,0.85);">
+      {artwork['title']}
     </div>
   </div>
 
-  <!-- Bottom overlay: emotions + progress bar -->
+  <!-- Bottom: AI explanation -->
   <div style="position:absolute;bottom:0;left:0;right:0;z-index:5;
-              background:linear-gradient(transparent,rgba(28,20,16,0.88) 25%,rgba(28,20,16,0.96));
-              padding:3vh 6vw 2.5vh;">
-    <div style="font-family:'Cinzel',serif;font-size:clamp(0.65rem,0.85vw,0.85rem);
-                letter-spacing:0.2em;color:#8B6F2E;text-align:center;margin-bottom:0.6rem;">
-      YOUR EMOTIONS
+              background:linear-gradient(transparent,rgba(28,20,16,0.85) 30%,rgba(28,20,16,0.97));
+              padding:6vh 8vw 4vh;text-align:center;">
+    <div style="font-family:'Cormorant Garamond',serif;
+                font-size:clamp(1.05rem,1.8vw,1.7rem);line-height:1.6;
+                color:#E0D0B0;max-width:64rem;margin:0 auto;">
+      We will now give this picture to an
+      <span style="font-family:'Cinzel',serif;font-weight:700;letter-spacing:0.18em;color:#C9A961;">AI</span>.
+      It will try to recreate the same picture &mdash;
+      <span style="color:#E8C87A;font-weight:600;">over 100 times</span>.
     </div>
-    {bars if bars else '<div style="font-family:\'Cormorant Garamond\',serif;font-style:italic;color:#8B6F2E;text-align:center;">Reading…</div>'}
-    <div style="height:2px;background:rgba(201,169,97,0.12);border-radius:2px;margin-top:1rem;">
-      <div style="width:{progress_pct}%;height:100%;background:linear-gradient(90deg,#8B6F2E,#C9A961);
-                  border-radius:2px;transition:width 0.3s linear;"></div>
+    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
+                font-size:clamp(0.95rem,1.5vw,1.4rem);
+                color:#8B6F2E;margin-top:1.2rem;letter-spacing:0.15em;">
+      Let us see what the AI does.
     </div>
   </div>
+</div>
+""", unsafe_allow_html=True)
+
+elif phase == "MORPHING":
+    artwork      = st.session_state.current_artwork
+    emotions     = camera_state.latest_emotions
+    total_frames = len(artwork["frames"]) - 1
+
+    # Stable HTML — same string every rerun, so React keeps the iframe mounted
+    # and the JS animation runs uninterrupted for the full 30s.
+    components.html(
+        _morphing_player_html(
+            stem=artwork["slug"],
+            total_frames=total_frames,
+            duration=MORPHING_DURATION,
+            phase_start=st.session_state.phase_entered_at,
+            title=artwork["title"],
+        ),
+        height=1080,
+    )
+
+    # Live emotion bars — separate Streamlit overlay, re-renders each tick on
+    # top of the iframe (z-index higher than the iframe's 9999).
+    bars = ""
+    for eng, val in sorted(emotions.items(), key=lambda x: -x[1])[:5]:
+        label_name = EMOTION_LATIN.get(eng, eng.capitalize())
+        pct = round(val * 100, 1)
+        bars += (
+            f'<div style="margin:0.3rem 0;">'
+            f'<div style="display:flex;justify-content:space-between;'
+            f'font-family:\'Cinzel\',serif;font-size:clamp(0.8rem,1.1vw,1.1rem);'
+            f'letter-spacing:0.07em;color:#C9A961;margin-bottom:3px;">'
+            f'<span>{label_name}</span><span>{pct}%</span></div>'
+            f'<div style="height:clamp(5px,0.8vw,9px);background:rgba(201,169,97,0.15);'
+            f'border-radius:5px;overflow:hidden;">'
+            f'<div style="width:{pct}%;height:100%;'
+            f'background:linear-gradient(90deg,#8B6F2E,#E8C87A);'
+            f'border-radius:5px;transition:width 0.2s linear;"></div></div></div>'
+        )
+
+    if not bars:
+        bars = (
+            '<div style="font-family:\'Cormorant Garamond\',serif;font-style:italic;'
+            'color:#8B6F2E;text-align:center;">Reading…</div>'
+        )
+
+    st.markdown(f"""
+<div class="morphing-emotion-overlay">
+  <div style="font-family:'Cinzel',serif;font-size:clamp(0.65rem,0.85vw,0.85rem);
+              letter-spacing:0.2em;color:#8B6F2E;text-align:center;margin-bottom:0.6rem;">
+    YOUR EMOTIONS
+  </div>
+  {bars}
 </div>
 """, unsafe_allow_html=True)
 
@@ -482,36 +888,18 @@ elif phase == "RECAP":
         )
     graph_b64 = st.session_state.recap_graph
 
-    # ── 2×2 thumbnail grid — pick 4 evenly-spaced frames ────────────────────
-    frames = artwork["frames"]
-    n      = len(frames) - 1   # e.g. 100
-    thumb_paths = [
-        frames[0],
-        frames[max(1, n // 3)],
-        frames[max(1, 2 * n // 3)],
-        frames[n],
-    ]
-    thumb_uris = [_artwork_data_uri(p) for p in thumb_paths]
-
-    stage_labels_en = ["ORIGINAL", "LIGHT", "MEDIUM", "DEEP"]
-    thumb_cells_grid = ""
-    for lbl, uri in zip(stage_labels_en, thumb_uris):
-        img_tag = (
-            f'<img src="{uri}" style="width:100%;height:20vh;object-fit:contain;display:block;" />'
-            if uri else '<div style="height:20vh;background:#0a0806;"></div>'
-        )
-        thumb_cells_grid += f"""
-<div style="text-align:center;">
-  <div style="font-family:'Cinzel',serif;font-size:clamp(0.5rem,0.7vw,0.72rem);
-              letter-spacing:0.15em;color:#8B6F2E;margin-bottom:0.25rem;">{lbl}</div>
-  <div style="border:2px solid #3D2810;padding:3px;background:#0a0806;">{img_tag}</div>
-</div>"""
+    # ── Two thumbnails: original + final frame ──────────────────────────────
+    slug      = artwork["slug"]
+    first_url = f"/app/static/frames/{slug}/0000.png"
+    last_url  = f"/app/static/frames/{slug}/{len(artwork['frames']) - 1:04d}.png"
 
     graph_tag = (
         f'<img src="data:image/png;base64,{graph_b64}" '
-        f'style="width:100%;max-height:20vh;height:auto;border-radius:4px;border:1px solid #3D2810;display:block;" />'
+        f'style="width:100%;max-height:34vh;height:auto;border-radius:4px;'
+        f'border:1px solid #3D2810;display:block;" />'
         if graph_b64 else
-        '<div style="color:#8B6F2E;font-style:italic;text-align:center;padding:1rem;">No emotion data recorded.</div>'
+        '<div style="color:#8B6F2E;font-style:italic;text-align:center;padding:1rem;">'
+        'No emotion data recorded.</div>'
     )
 
     st.markdown(f"""
@@ -524,31 +912,49 @@ elif phase == "RECAP":
               pointer-events:none;z-index:20;"></div>
 
   <!-- Header -->
-  <div style="text-align:center;margin-bottom:1vh;width:100%;flex-shrink:0;">
+  <div style="text-align:center;margin-bottom:1.2vh;width:100%;flex-shrink:0;">
     <div style="font-family:'Cinzel',serif;font-weight:700;
                 font-size:clamp(0.85rem,1.4vw,1.3rem);letter-spacing:0.3em;color:#8B6F2E;">
       YOUR EMOTIONAL DESCENT
     </div>
     <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
-                font-size:clamp(0.85rem,1.1vw,1.1rem);color:#8B6F2E;opacity:0.7;margin-top:0.2rem;">
+                font-size:clamp(0.9rem,1.2vw,1.2rem);color:#8B6F2E;opacity:0.8;margin-top:0.2rem;">
       {artwork['title']}
     </div>
   </div>
 
-  <!-- 2×2 thumbnail grid -->
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.4rem;width:100%;flex-shrink:0;margin-bottom:1vh;">
-    {thumb_cells_grid}
+  <!-- Before / after: original + final frame, side-by-side -->
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5vw;width:100%;
+              flex-shrink:0;margin-bottom:1.5vh;">
+    <div style="text-align:center;">
+      <div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.85vw,0.85rem);
+                  letter-spacing:0.22em;color:#8B6F2E;margin-bottom:0.4rem;">
+        ORIGINAL
+      </div>
+      <div style="border:2px solid #3D2810;padding:4px;background:#0a0806;">
+        <img src="{first_url}" style="width:100%;height:28vh;object-fit:contain;display:block;" />
+      </div>
+    </div>
+    <div style="text-align:center;">
+      <div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.85vw,0.85rem);
+                  letter-spacing:0.22em;color:#8B6F2E;margin-bottom:0.4rem;">
+        AFTER 100 ITERATIONS
+      </div>
+      <div style="border:2px solid #3D2810;padding:4px;background:#0a0806;">
+        <img src="{last_url}" style="width:100%;height:28vh;object-fit:contain;display:block;" />
+      </div>
+    </div>
   </div>
 
-  <!-- Compact emotion graph -->
-  <div style="width:100%;flex-shrink:0;margin-bottom:1vh;">
+  <!-- Emotion graph -->
+  <div style="width:100%;flex-shrink:0;margin-bottom:1.5vh;">
     {graph_tag}
   </div>
 
-  <!-- Prominent verdict seal -->
+  <!-- Verdict seal -->
   <div style="display:flex;justify-content:center;flex-shrink:0;">
     <div class="seal-medallion" style="
-                width:clamp(110px,16vw,180px);height:clamp(110px,16vw,180px);
+                width:clamp(110px,15vw,170px);height:clamp(110px,15vw,170px);
                 border:5px solid {sc};
                 background:radial-gradient(circle at 40% 35%,{sc}66,{sc}22);
                 color:{sc};font-size:clamp(1rem,1.8vw,1.6rem);">

@@ -5,6 +5,7 @@ BASE_DIR = Path(__file__).parent
 # Timing (seconds)
 LOCK_STABILITY_DURATION   = 1.5
 LOCKED_TRANSITION_DURATION = 2.5
+INTRO_DURATION            = 8.0
 MORPHING_DURATION         = 30.0
 RECAP_DURATION            = 15.0
 FADE_DURATION             = 3.0
@@ -39,6 +40,10 @@ VERDICT_WEIGHTS = {
 }
 VERDICT_VALLIS_THRESHOLD = 0.60
 VERDICT_FIRMA_THRESHOLD  = 0.40
+
+# Attract screen (shown during IDLE when no one is interacting)
+ATTRACT_CYCLE_S    = 30   # total cycle length in seconds
+ATTRACT_DURATION_S = 15   # how long the attract screen stays visible per cycle
 
 # Back-compat aliases
 VERDICT_ARS_THRESHOLD   = VERDICT_VALLIS_THRESHOLD

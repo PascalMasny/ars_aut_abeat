@@ -3,15 +3,17 @@ import streamlit as st
 from config import (
     LOCK_STABILITY_DURATION,
     LOCKED_TRANSITION_DURATION,
+    INTRO_DURATION,
     MORPHING_DURATION,
     RECAP_DURATION,
     FADE_DURATION,
 )
 
-PHASES = ["IDLE", "LOCKED", "MORPHING", "RECAP", "FADE"]
+PHASES = ["IDLE", "LOCKED", "INTRO", "MORPHING", "RECAP", "FADE"]
 
 PHASE_DURATIONS = {
     "LOCKED":   LOCKED_TRANSITION_DURATION,
+    "INTRO":    INTRO_DURATION,
     "MORPHING": MORPHING_DURATION,
     "RECAP":    RECAP_DURATION,
     "FADE":     FADE_DURATION,
@@ -51,6 +53,10 @@ def advance_state(camera_state, catalog_manager, db_session):
 
     elif phase == "LOCKED":
         if t >= PHASE_DURATIONS["LOCKED"]:
+            enter_phase("INTRO")
+
+    elif phase == "INTRO":
+        if t >= PHASE_DURATIONS["INTRO"]:
             enter_phase("MORPHING")
             # Reset started_at so duration_seconds reflects MORPHING time only
             st.session_state.viewer_session.started_at = time.time()

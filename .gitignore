@@ -25,6 +25,9 @@ data/gallery.db
 data/*.db
 *.log
 
+# Static-serving symlink (points to catalog_iterations, re-created by setup)
+ars_aut_abeat/static/frames
+
 # Generated image sequences — up to 100 frames per artwork, can exceed 10 GB
 uncanny_maker/catalog_iterations/
 uncanny_maker/catalog_uncanny/

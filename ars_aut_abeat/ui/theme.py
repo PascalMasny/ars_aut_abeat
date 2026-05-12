@@ -77,27 +77,33 @@ html, body {{
     background: transparent !important;
 }}
 
-/* ─── WebRTC camera — iframe escapes to full viewport ───────────────────────
-   Parent stays in the normal Streamlit flow (do NOT position:fixed it —
-   that breaks the component's sizing protocol and causes peer renegotiation
-   on every rerun). Instead, the iframe itself is position:fixed and pinned
-   to 100vw/100vh, which visually fills the screen without touching parent flow. */
-[data-testid="stCustomComponentV1"]:nth-of-type(1) {{
-    width: 100% !important;
+/* ─── WebRTC camera — visible during setup, collapsed once camera is running.
+   When `body.camera-running` is set by app.py, the component is hidden.       */
+body.camera-running [data-testid="stCustomComponentV1"]:nth-of-type(1) {{
+    width: 0 !important;
+    height: 0 !important;
     margin: 0 !important;
     padding: 0 !important;
-    overflow: visible !important;
+    overflow: hidden !important;
+    position: absolute !important;
 }}
-[data-testid="stCustomComponentV1"]:nth-of-type(1) iframe {{
+/* Setup-state styling: pin the picker to bottom-center, frame it in gold */
+body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) {{
     position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    border: none !important;
-    z-index: 1 !important;
-    opacity: 0 !important;
-    pointer-events: none !important;
+    bottom: 6vh; left: 50%;
+    transform: translateX(-50%);
+    width: min(48rem, 86vw) !important;
+    z-index: 10002 !important;
+    background: rgba(28,20,16,0.96) !important;
+    border: 2px solid #C9A961 !important;
+    border-radius: 6px !important;
+    padding: 0.6rem !important;
+    box-shadow: 0 0 40px rgba(201,169,97,0.35) !important;
+}}
+body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) iframe {{
+    width: 100% !important;
+    min-height: 18vh !important;
+    background: #0a0806 !important;
 }}
 
 /* ─── Overlay text on top of the video feed ─── */
@@ -239,6 +245,34 @@ html, body {{
     padding: clamp(0.75rem, 2vw, 2rem);
     /* Black bars on sides if screen wider than 16:9 */
     box-shadow: -50vw 0 0 50vw var(--ink-black), 50vw 0 0 50vw var(--ink-black);
+}}
+
+/* ─── Live emotion bars overlaid on top of the morphing iframe ────────────── */
+.morphing-emotion-overlay {{
+    position: fixed;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    width: min(100vw, calc(100vh * 16 / 9));
+    z-index: 10000;
+    background: linear-gradient(transparent, rgba(28,20,16,0.88) 25%, rgba(28,20,16,0.96));
+    padding: 3vh 6vw 3.5vh;
+    pointer-events: none;
+}}
+
+/* ─── Morphing animation player — fullscreen iframe injected during MORPHING ─ */
+[data-testid="stCustomComponentV1"]:nth-of-type(3) {{
+    height: 0 !important;
+    overflow: visible !important;
+    position: relative !important;
+}}
+[data-testid="stCustomComponentV1"]:nth-of-type(3) iframe {{
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    border: none !important;
+    z-index: 9999 !important;
 }}
 
 /* VIEWING split: artwork + emotions side-by-side on wide, stacked on narrow */
@@ -512,6 +546,63 @@ html, body {{
     color: var(--gold);
     font-size: 1.4rem;
     letter-spacing: 0.1em;
+}}
+
+/* ── Attract screen ─────────────────────────────────────────────────────────
+   Slides in from below, same 16:9 centred viewport as .gallery-overlay.
+   Python controls visibility by rendering one block vs the other — the CSS
+   animation fires automatically on mount (no JS needed).                    */
+.attract-overlay {{
+    position: fixed !important;
+    top: 0; left: 50%;
+    transform: translateX(-50%);
+    width: min(100vw, calc(100vh * 16 / 9));
+    height: 100vh;
+    background: var(--ink-black);
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    padding: clamp(1rem, 2.5vw, 2.5rem) clamp(1.5rem, 4vw, 4rem);
+    box-shadow: -50vw 0 0 50vw var(--ink-black), 50vw 0 0 50vw var(--ink-black);
+    animation: attractSlideIn 0.65s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}}
+
+.attract-overlay::after {{
+    content: '';
+    position: absolute;
+    top: 8px; left: 8px; right: 8px; bottom: 8px;
+    border: 3px solid var(--gold);
+    box-shadow:
+        0 0 0 1px var(--gold-dark),
+        inset 0 0 0 1px var(--gold-dark),
+        0 0 40px rgba(201,169,97,0.18),
+        inset 0 0 40px rgba(201,169,97,0.06);
+    pointer-events: none;
+}}
+
+@keyframes attractSlideIn {{
+    from {{ opacity: 0; transform: translateX(-50%) translateY(44px); }}
+    to   {{ opacity: 1; transform: translateX(-50%) translateY(0);    }}
+}}
+
+.attract-soul-counter {{
+    font-family: 'Cinzel', serif;
+    font-weight: 900;
+    font-size: clamp(1.6rem, 4.5vw, 4rem);
+    letter-spacing: 0.18em;
+    color: var(--gold);
+    text-align: center;
+    text-shadow: 0 0 40px rgba(201,169,97,0.45);
+    margin: 0.5rem 0;
+    animation: soulPulse 3s ease-in-out infinite;
+}}
+
+@keyframes soulPulse {{
+    0%, 100% {{ opacity: 1;    text-shadow: 0 0 40px rgba(201,169,97,0.45); }}
+    50%       {{ opacity: 0.75; text-shadow: 0 0 80px rgba(201,169,97,0.25); }}
 }}
 </style>
 """.format(fonts=GOOGLE_FONTS_URL)
