@@ -236,7 +236,7 @@ html, body, #root {
 .attract-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.1rem, 2.8vw, 2.4rem);
+  font-size: clamp(1.4rem, 5.5vw, 3rem);
   letter-spacing: 0.25em;
   color: var(--gold);
   text-align: center;
@@ -245,7 +245,7 @@ html, body, #root {
 .attract-tagline {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.85rem, 1.2vw, 1.15rem);
+  font-size: clamp(0.9rem, 3vw, 1.5rem);
   letter-spacing: 0.2em;
   color: var(--gold-dark);
   margin-top: 0.3rem;
@@ -255,7 +255,7 @@ html, body, #root {
 .attract-concept {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.9rem, 1.3vw, 1.25rem);
+  font-size: clamp(0.9rem, 3.2vw, 1.5rem);
   color: var(--parchment-d);
   line-height: 1.7;
   text-align: center;
@@ -266,7 +266,7 @@ html, body, #root {
 .attract-soul-counter {
   font-family: 'Cinzel', serif;
   font-weight: 900;
-  font-size: clamp(1.6rem, 4.5vw, 4rem);
+  font-size: clamp(2rem, 9vw, 5.5rem);
   letter-spacing: 0.18em;
   color: var(--gold);
   text-align: center;
@@ -283,20 +283,23 @@ html, body, #root {
 .attract-cta {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.85rem, 1.6vw, 1.4rem);
+  font-size: clamp(0.9rem, 3.5vw, 1.8rem);
   letter-spacing: 0.2em;
   color: var(--gold);
   text-align: center;
 }
 
+/* Portrait-stacked graph (donut on top, bars below): let natural height show.
+   The figsize 5:6 gives ~1:1.2 aspect → at full column width ≈ 600 px the
+   rendered height is ~720 px → max-height caps it at a reasonable slice. */
 .attract-graph {
   width: 100%;
-  max-height: 38vh;
+  max-height: 50vh;
   height: auto;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid #3D2810;
   display: block;
-  margin: 0.6rem 0;
+  margin: 0.5rem 0;
 }
 
 /* ─── INTRO phase ───────────────────────────────────────────────────────── */
@@ -490,47 +493,48 @@ html, body, #root {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  padding: 2.5vh 3vw 2vh;
+  /* Extra top padding clears the gilt border (8px inset + 3px border) */
+  padding: 3vh 4vw 2.5vh;
+  gap: 1.6vh;
 }
 
 .recap-header {
   text-align: center;
-  margin-bottom: 1.2vh;
   flex-shrink: 0;
 }
 
+/* In 112:199 portrait the column is ~56 vh wide — use vw-of-column via
+   clamp with a generous upper bound so text scales with the display size */
 .recap-section-label {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.85rem, 1.4vw, 1.3rem);
-  letter-spacing: 0.3em;
+  font-size: clamp(1rem, 4.5vw, 2rem);
+  letter-spacing: 0.28em;
   color: var(--gold-dark);
 }
 
 .recap-artwork-name {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.9rem, 1.2vw, 1.2rem);
-  color: var(--gold-dark);
-  opacity: 0.8;
-  margin-top: 0.2rem;
+  font-size: clamp(1rem, 3.8vw, 1.7rem);
+  color: var(--gold);
+  margin-top: 0.3rem;
 }
 
 .recap-thumbnails {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 1.5vw;
+  gap: 2vw;
   width: 100%;
   flex-shrink: 0;
-  margin-bottom: 1.5vh;
 }
 
 .recap-thumb-label {
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.6rem, 0.85vw, 0.85rem);
-  letter-spacing: 0.22em;
+  font-size: clamp(0.7rem, 2.8vw, 1.1rem);
+  letter-spacing: 0.2em;
   color: var(--gold-dark);
-  margin-bottom: 0.4rem;
+  margin-bottom: 0.5rem;
   text-align: center;
 }
 
@@ -542,19 +546,19 @@ html, body, #root {
 
 .recap-thumb-frame img {
   width: 100%;
-  height: 28vh;
-  object-fit: contain;
+  height: 22vh;
+  object-fit: cover;
   display: block;
 }
 
+/* Graph: let it fill column width; height is determined by the image's
+   own aspect ratio (figsize 6:3.2 ≈ 1.875:1) — no max-height clipping */
 .recap-graph {
   width: 100%;
-  max-height: 34vh;
   height: auto;
-  border-radius: 4px;
+  border-radius: 6px;
   border: 1px solid #3D2810;
   display: block;
-  margin-bottom: 1.5vh;
   flex-shrink: 0;
 }
 
@@ -562,19 +566,22 @@ html, body, #root {
   display: flex;
   justify-content: center;
   flex-shrink: 0;
+  padding-bottom: 1vh;
 }
 
+/* Seal sized relative to the viewport width of the portrait column.
+   At 607 px wide: 22vw ≈ 133 px — comfortable but not overwhelming */
 .seal-medallion {
-  width: clamp(110px, 15vw, 170px);
-  height: clamp(110px, 15vw, 170px);
+  width: clamp(100px, 22vw, 180px);
+  height: clamp(100px, 22vw, 180px);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Cinzel', serif;
   font-weight: 900;
-  font-size: clamp(1rem, 1.8vw, 1.6rem);
-  letter-spacing: 0.06em;
+  font-size: clamp(1.1rem, 5vw, 2.2rem);
+  letter-spacing: 0.08em;
   transform: rotate(-6deg);
   box-shadow: 0 6px 24px rgba(0,0,0,0.5);
   animation: stamp 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97);

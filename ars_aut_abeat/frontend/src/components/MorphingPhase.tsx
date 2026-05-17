@@ -36,11 +36,12 @@ export function MorphingPhase({ state }: Props) {
     let curIdx = -1
     let nextIdx = -1
 
-    // Piecewise easing: first 10 frames are shown slowly (occupy the first
-    // 40% of total duration) so the original → early-degradation transition
-    // is legible. Remaining 90 frames play at normal speed.
-    const SLOW_FRAMES = 10
-    const SLOW_SPLIT  = 0.40
+    // Piecewise easing: frames 0–5 (original → first AI distortions) occupy
+    // the first 50% of total duration (~15 s each frame ≈ 3 s visible).
+    // Frames 5–100 race through the remaining 50% so the full degradation arc
+    // is seen without the end feeling rushed.
+    const SLOW_FRAMES = 5
+    const SLOW_SPLIT  = 0.50
 
     const tick = () => {
       const elapsed = Date.now() / 1000 - phase_started_at
