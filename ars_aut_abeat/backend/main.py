@@ -33,6 +33,12 @@ if _CATALOG_DIR.exists():
 @app.on_event("startup")
 def startup():
     init_db()
+    # Pre-warm the vision processor: starts the analysis background thread and
+    # triggers the MediaPipe model download in the background. Models are fully
+    # loaded before the first visitor connects, eliminating cold-start lag.
+    from backend.ws_handler import get_processor, get_catalog
+    get_processor()
+    get_catalog()
 
 
 @app.websocket("/ws")

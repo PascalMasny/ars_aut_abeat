@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { ServerState } from '../hooks/useWebSocket'
 
 interface Props {
@@ -22,14 +22,12 @@ export function MorphingPhase({ state }: Props) {
   const totalFrames = artwork?.total_frames ?? 100
   const slug = artwork?.slug ?? ''
 
-  // Preload all frames on mount.
-  useEffect(() => {
-    if (!slug) return
-    for (let i = 0; i <= totalFrames; i++) {
-      const img = new Image()
-      img.src = `/frames/${slug}/${String(i).padStart(4, '0')}.png`
-    }
-  }, [slug, totalFrames])
+  // Pin frame 0 synchronously before first paint — eliminates the one-frame
+  // gap where imgA has no src and the camera would show through.
+  useLayoutEffect(() => {
+    if (!slug || !imgARef.current) return
+    imgARef.current.src = `/frames/${slug}/0000.png`
+  }, [slug])
 
   // rAF crossfade loop — driven by wall-clock time anchored to phase_started_at.
   useEffect(() => {
@@ -78,6 +76,7 @@ export function MorphingPhase({ state }: Props) {
 
   return (
     <div className="morphing-container">
+      {/* imgA gets its initial src set via useLayoutEffect before first paint */}
       <img ref={imgARef} className="morphing-img" alt="" />
       <img ref={imgBRef} className="morphing-img" style={{ opacity: 0 }} alt="" />
 

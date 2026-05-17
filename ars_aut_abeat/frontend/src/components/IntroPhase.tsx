@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import type { ServerState } from '../hooks/useWebSocket'
 
 interface Props {
@@ -6,6 +7,18 @@ interface Props {
 
 export function IntroPhase({ state }: Props) {
   const { artwork } = state
+
+  // Preload all morphing frames during the 8s INTRO so they are cached
+  // before MorphingPhase starts — prevents flicker on early frames.
+  useEffect(() => {
+    if (!artwork) return
+    const { slug, total_frames } = artwork
+    for (let i = 0; i <= total_frames; i++) {
+      const img = new Image()
+      img.src = `/frames/${slug}/${String(i).padStart(4, '0')}.png`
+    }
+  }, [artwork?.slug])  // eslint-disable-line react-hooks/exhaustive-deps
+
   if (!artwork) return null
 
   const firstFrameUrl = `/frames/${artwork.slug}/0000.png`
