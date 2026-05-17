@@ -1,17 +1,13 @@
 """
 Video processor for the gallery camera.
 
-Architecture: the WebRTC recv() callback must return FAST (< 16ms) or the
-video feed stutters. All heavy work (MediaPipe landmark detection, head pose,
-blendshapes → emotions) runs in a separate daemon thread that picks up the
-latest frame and writes results to a thread-safe CameraState.
+FastAPI mode: browser sends binary JPEG frames over WebSocket.
+push_frame(jpeg_bytes) decodes and runs the analysis pipeline.
 
-The recv() callback does two things:
-  1. Stash the latest frame for the analysis thread.
-  2. Return the frame immediately (no processing delay).
+Analysis runs in a background thread at ~10 Hz. Thread-safe CameraState
+is written there and read by the WebSocket handler on the main thread.
 """
 
-import av
 import copy
 import cv2
 import threading
@@ -20,13 +16,12 @@ import urllib.request
 import numpy as np
 from dataclasses import dataclass, field
 from pathlib import Path
-from streamlit_webrtc import VideoProcessorBase
+from typing import Optional
 
 from vision.face_detector import FaceResult
 from vision.gaze import is_looking_at_camera, most_centered_face
 from config import MIN_FACE_AREA_FRACTION, EMOTION_SAMPLE_RATE_HZ
 
-# 3D canonical face model points for head pose (solvePnP)
 _MODEL_POINTS = np.array([
     [0.0,    0.0,    0.0],
     [0.0,  -330.0,  -65.0],
@@ -49,7 +44,7 @@ def _download(url: str, dest: Path) -> bool:
         return False
 
 
-def _head_pose(landmarks, w: int, h: int) -> tuple[float, float, float]:
+def _head_pose(landmarks, w: int, h: int) -> tuple:
     try:
         image_points = np.array(
             [[landmarks[i].x * w, landmarks[i].y * h] for i in _LANDMARK_INDICES],
@@ -73,34 +68,31 @@ class CameraState:
     face_present: bool = False
     face_centered: bool = False
     hands_raised: bool = False
-    hands_raised_since: float | None = None
-    stable_since: float | None = None
-    latest_emotions: dict[str, float] = field(default_factory=dict)
+    hands_raised_since: Optional[float] = None
+    stable_since: Optional[float] = None
+    latest_emotions: dict = field(default_factory=dict)
     frame_w: int = 640
     frame_h: int = 480
     num_faces: int = 0
 
 
-class GalleryVideoProcessor(VideoProcessorBase):
+class GalleryProcessor:
+    """Frame processor for the FastAPI backend. Call push_frame() with JPEG bytes."""
 
     def __init__(self):
         self._state_lock = threading.Lock()
         self._state = CameraState()
 
-        # Latest frame buffer — written by recv(), read by analysis thread
         self._frame_lock = threading.Lock()
-        self._latest_rgb: np.ndarray | None = None
-        self._latest_shape: tuple[int, int] = (480, 640)
+        self._latest_rgb: Optional[np.ndarray] = None
+        self._latest_shape: tuple = (480, 640)
 
         self._do_emotion = False
-        self._do_pose = True  # default on until phase tells us otherwise
+        self._do_pose = True
         self._running = True
 
-        # Start analysis daemon thread with its OWN landmarker instance
         self._analysis_thread = threading.Thread(target=self._analysis_loop, daemon=True)
         self._analysis_thread.start()
-
-    # --- public API (called from Streamlit main thread) ---
 
     def get_state(self) -> CameraState:
         with self._state_lock:
@@ -112,26 +104,21 @@ class GalleryVideoProcessor(VideoProcessorBase):
     def set_pose_sampling(self, active: bool):
         self._do_pose = active
 
-    # --- WebRTC callback — must be FAST ---
-
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format="bgr24")
+    def push_frame(self, jpeg_bytes: bytes):
+        arr = np.frombuffer(jpeg_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         h, w = img.shape[:2]
-
         with self._frame_lock:
             self._latest_rgb = img_rgb
             self._latest_shape = (h, w)
 
-        return av.VideoFrame.from_ndarray(img, format="bgr24")
-
-    def on_ended(self):
+    def stop(self):
         self._running = False
 
-    # --- Analysis thread — runs at ~5-10 Hz in background ---
-
     def _analysis_loop(self):
-        """Runs in a separate thread. Creates its own MediaPipe landmarkers."""
         import mediapipe as mp
         from mediapipe.tasks import python as mp_python
         from mediapipe.tasks.python import vision as mp_vision
@@ -142,7 +129,7 @@ class GalleryVideoProcessor(VideoProcessorBase):
 
         _POSE_CACHE = _MODEL_CACHE.parent / "pose_landmarker_lite.task"
         if not _POSE_CACHE.exists():
-            _download(_POSE_URL, _POSE_CACHE)  # best-effort; face still works without pose
+            _download(_POSE_URL, _POSE_CACHE)
 
         base_opts = mp_python.BaseOptions(model_asset_path=str(_MODEL_CACHE))
         opts = mp_vision.FaceLandmarkerOptions(
@@ -190,8 +177,8 @@ class GalleryVideoProcessor(VideoProcessorBase):
                 time.sleep(0.1)
                 continue
 
-            faces: list[FaceResult] = []
-            emotions = {}
+            faces: list = []
+            emotions: dict = {}
 
             if result.face_landmarks:
                 for i, lm_list in enumerate(result.face_landmarks):
@@ -225,9 +212,6 @@ class GalleryVideoProcessor(VideoProcessorBase):
                     pose_result = pose_landmarker.detect(mp_image)
                     if pose_result.pose_landmarks:
                         pose = pose_result.pose_landmarks[0]
-                        # Landmarks: 11=left_shoulder, 12=right_shoulder,
-                        #            15=left_wrist, 16=right_wrist
-                        # y increases downward → wrist above shoulder means y smaller
                         hands_up = (
                             pose[15].y < pose[11].y
                             and pose[16].y < pose[12].y
@@ -256,9 +240,8 @@ class GalleryVideoProcessor(VideoProcessorBase):
                 elif not hands_up:
                     self._state.hands_raised_since = None
 
-            elapsed = time.time() - loop_start
-            sleep_for = max(0.01, target_interval - elapsed)
-            time.sleep(sleep_for)
+            elapsed_loop = time.time() - loop_start
+            time.sleep(max(0.01, target_interval - elapsed_loop))
 
         landmarker.close()
         if pose_landmarker:

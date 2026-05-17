@@ -1,92 +1,74 @@
 import time
-import streamlit as st
+from dataclasses import dataclass, field
+from typing import Optional
 from config import (
     LOCK_STABILITY_DURATION,
-    LOCKED_TRANSITION_DURATION,
     INTRO_DURATION,
     MORPHING_DURATION,
     RECAP_DURATION,
-    FADE_DURATION,
 )
 
-PHASES = ["IDLE", "LOCKED", "INTRO", "MORPHING", "RECAP", "FADE"]
+PHASES = ["IDLE", "INTRO", "MORPHING", "RECAP"]
 
 PHASE_DURATIONS = {
-    "LOCKED":   LOCKED_TRANSITION_DURATION,
     "INTRO":    INTRO_DURATION,
     "MORPHING": MORPHING_DURATION,
     "RECAP":    RECAP_DURATION,
-    "FADE":     FADE_DURATION,
 }
 
 
-def init_state():
-    defaults = {
-        "phase":           "IDLE",
-        "phase_entered_at": time.time(),
-        "viewer_session":  None,
-        "avg_emotions":    {},
-        "personal_verdict": "",
-        "current_artwork": None,
-    }
-    for k, v in defaults.items():
-        if k not in st.session_state:
-            st.session_state[k] = v
-    # Migrate any session that still has a removed phase (LOCKED/FADE) back to
-    # IDLE so visitors landing mid-flow don't see deleted screens.
-    if st.session_state.get("phase") in ("LOCKED", "FADE"):
-        st.session_state.phase = "IDLE"
-        st.session_state.phase_entered_at = time.time()
+@dataclass
+class InstallationState:
+    phase: str = "IDLE"
+    phase_entered_at: float = field(default_factory=time.time)
+    viewer_session: Optional[object] = None
+    avg_emotions: dict = field(default_factory=dict)
+    personal_verdict: str = ""
+    personal_lines: list = field(default_factory=list)
+    current_artwork: Optional[dict] = None
+    collective_data: Optional[dict] = None
+    recap_graph_b64: Optional[str] = None
+    attract_graph_b64: Optional[str] = None
+    attract_viewing_count: int = -1
 
 
-def elapsed() -> float:
-    return time.time() - st.session_state.phase_entered_at
+def elapsed(state: InstallationState) -> float:
+    return time.time() - state.phase_entered_at
 
 
-def enter_phase(phase: str):
-    st.session_state.phase = phase
-    st.session_state.phase_entered_at = time.time()
+def enter_phase(state: InstallationState, phase: str):
+    state.phase = phase
+    state.phase_entered_at = time.time()
 
 
-def advance_state(camera_state, catalog_manager, db_session):
-    """Called on every rerun. Reads camera state + timing, transitions phases."""
-    phase = st.session_state.phase
-    t = elapsed()
+def advance_state(state: InstallationState, camera_state, catalog_manager, db_session):
+    """Called on every frame tick. Reads camera state + timing, transitions phases."""
+    phase = state.phase
+    t = elapsed(state)
 
     if phase == "IDLE":
-        _handle_idle(camera_state, catalog_manager)
-
-    elif phase == "LOCKED":
-        # LOCKED was removed; any lingering state jumps straight to INTRO.
-        enter_phase("INTRO")
+        _handle_idle(state, camera_state, catalog_manager)
 
     elif phase == "INTRO":
         if t >= PHASE_DURATIONS["INTRO"]:
-            enter_phase("MORPHING")
-            # Reset started_at so duration_seconds reflects MORPHING time only
-            st.session_state.viewer_session.started_at = time.time()
+            enter_phase(state, "MORPHING")
+            state.viewer_session.started_at = time.time()
 
     elif phase == "MORPHING":
-        s = st.session_state.viewer_session
+        s = state.viewer_session
         if camera_state.latest_emotions:
             s.add_sample(camera_state.latest_emotions, elapsed=t)
         if t >= PHASE_DURATIONS["MORPHING"]:
-            _finalize_viewing(db_session, camera_state)
-            enter_phase("RECAP")
+            _finalize_viewing(state, db_session, camera_state)
+            enter_phase(state, "RECAP")
 
     elif phase == "RECAP":
         if t >= PHASE_DURATIONS["RECAP"]:
-            _reset()
-            enter_phase("IDLE")
-
-    elif phase == "FADE":
-        # Legacy: in case anything still lingers in FADE, fall straight back to
-        # IDLE. The dedicated "valley awaits the next soul" screen was removed.
-        _reset()
-        enter_phase("IDLE")
+            _reset(state)
+            enter_phase(state, "IDLE")
 
 
-def _handle_idle(camera_state, catalog_manager):
+def _handle_idle(state: InstallationState, camera_state, catalog_manager):
     from core.session import ViewerSession
 
     if not camera_state.hands_raised or camera_state.hands_raised_since is None:
@@ -98,35 +80,36 @@ def _handle_idle(camera_state, catalog_manager):
         if artwork is None:
             return
         session = ViewerSession(artwork_id=artwork["id"], artwork_slug=artwork["slug"])
-        st.session_state.viewer_session = session
-        st.session_state.current_artwork = artwork
-        # Skip the "SPECTATOR IDENTIFIED" interstitial — jump straight into
-        # INTRO, which already establishes the artwork.
-        enter_phase("INTRO")
+        state.viewer_session = session
+        state.current_artwork = artwork
+        state.recap_graph_b64 = None
+        enter_phase(state, "INTRO")
 
 
-def _finalize_viewing(db_session, camera_state):
+def _finalize_viewing(state: InstallationState, db_session, camera_state):
     from vision.emotion import average_samples
     from core.verdict import score_emotions, verdict_label, personal_verdict_text, save_viewing, collective_summary
 
-    s = st.session_state.viewer_session
+    s = state.viewer_session
     avg = average_samples(s.emotion_samples)
     score = score_emotions(avg)
     label = verdict_label(score)
 
-    st.session_state.avg_emotions = avg
-    st.session_state.personal_verdict = label
-    st.session_state.personal_lines = personal_verdict_text(avg)
+    state.avg_emotions = avg
+    state.personal_verdict = label
+    state.personal_lines = personal_verdict_text(avg)
 
     save_viewing(s, avg, label, db_session, num_faces=max(1, camera_state.num_faces))
 
     coll = collective_summary(s.artwork_id, avg, db_session)
-    st.session_state.collective_data = coll
+    state.collective_data = coll
 
 
-def _reset():
-    st.session_state.viewer_session  = None
-    st.session_state.avg_emotions    = {}
-    st.session_state.personal_verdict = ""
-    st.session_state.current_artwork = None
-    st.session_state.pop("recap_graph", None)
+def _reset(state: InstallationState):
+    state.viewer_session = None
+    state.avg_emotions = {}
+    state.personal_verdict = ""
+    state.personal_lines = []
+    state.current_artwork = None
+    state.collective_data = None
+    state.recap_graph_b64 = None

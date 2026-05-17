@@ -1,4 +1,3 @@
-import streamlit as st
 from pathlib import Path
 from sqlalchemy import func
 from config import (
@@ -10,10 +9,14 @@ from data.models import Artwork, Viewing
 
 _ITERATIONS_ROOT = UNCANNY_OG_DIR.parent / "catalog_iterations"
 
+_manager: "CatalogManager | None" = None
 
-@st.cache_resource(ttl=300)
-def get_catalog_manager():
-    return CatalogManager()
+
+def get_catalog_manager() -> "CatalogManager":
+    global _manager
+    if _manager is None:
+        _manager = CatalogManager()
+    return _manager
 
 
 def _parse_stem(stem: str) -> tuple[str, str]:
