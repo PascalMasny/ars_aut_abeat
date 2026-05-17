@@ -36,10 +36,19 @@ export function MorphingPhase({ state }: Props) {
     let curIdx = -1
     let nextIdx = -1
 
+    // Piecewise easing: first 10 frames are shown slowly (occupy the first
+    // 40% of total duration) so the original → early-degradation transition
+    // is legible. Remaining 90 frames play at normal speed.
+    const SLOW_FRAMES = 10
+    const SLOW_SPLIT  = 0.40
+
     const tick = () => {
       const elapsed = Date.now() / 1000 - phase_started_at
       const p = Math.min(elapsed / phase_duration, 1.0)
-      const raw = p * totalFrames
+      const raw =
+        p < SLOW_SPLIT
+          ? (p / SLOW_SPLIT) * SLOW_FRAMES
+          : SLOW_FRAMES + ((p - SLOW_SPLIT) / (1 - SLOW_SPLIT)) * (totalFrames - SLOW_FRAMES)
       const ci = Math.min(Math.floor(raw), totalFrames)
       const ni = Math.min(ci + 1, totalFrames)
       const blend = raw - Math.floor(raw)

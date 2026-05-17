@@ -393,8 +393,12 @@ html, body, #root {
   position: absolute;
   top: 0; left: 0; right: 0;
   z-index: 5;
-  background: linear-gradient(rgba(28,20,16,0.85) 0%, transparent 100%);
-  padding: 2.5vh 4vw 5vh;
+  background: linear-gradient(
+    rgba(28,20,16,0.97) 0%,
+    rgba(28,20,16,0.80) 55%,
+    transparent 100%
+  );
+  padding: 2.5vh 4vw 8vh;
   text-align: center;
 }
 
