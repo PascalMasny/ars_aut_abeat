@@ -32,6 +32,11 @@ def init_state():
     for k, v in defaults.items():
         if k not in st.session_state:
             st.session_state[k] = v
+    # Migrate any session that still has a removed phase (LOCKED/FADE) back to
+    # IDLE so visitors landing mid-flow don't see deleted screens.
+    if st.session_state.get("phase") in ("LOCKED", "FADE"):
+        st.session_state.phase = "IDLE"
+        st.session_state.phase_entered_at = time.time()
 
 
 def elapsed() -> float:
@@ -52,8 +57,8 @@ def advance_state(camera_state, catalog_manager, db_session):
         _handle_idle(camera_state, catalog_manager)
 
     elif phase == "LOCKED":
-        if t >= PHASE_DURATIONS["LOCKED"]:
-            enter_phase("INTRO")
+        # LOCKED was removed; any lingering state jumps straight to INTRO.
+        enter_phase("INTRO")
 
     elif phase == "INTRO":
         if t >= PHASE_DURATIONS["INTRO"]:
@@ -71,12 +76,14 @@ def advance_state(camera_state, catalog_manager, db_session):
 
     elif phase == "RECAP":
         if t >= PHASE_DURATIONS["RECAP"]:
-            enter_phase("FADE")
-
-    elif phase == "FADE":
-        if t >= PHASE_DURATIONS["FADE"]:
             _reset()
             enter_phase("IDLE")
+
+    elif phase == "FADE":
+        # Legacy: in case anything still lingers in FADE, fall straight back to
+        # IDLE. The dedicated "valley awaits the next soul" screen was removed.
+        _reset()
+        enter_phase("IDLE")
 
 
 def _handle_idle(camera_state, catalog_manager):
@@ -93,7 +100,9 @@ def _handle_idle(camera_state, catalog_manager):
         session = ViewerSession(artwork_id=artwork["id"], artwork_slug=artwork["slug"])
         st.session_state.viewer_session = session
         st.session_state.current_artwork = artwork
-        enter_phase("LOCKED")
+        # Skip the "SPECTATOR IDENTIFIED" interstitial — jump straight into
+        # INTRO, which already establishes the artwork.
+        enter_phase("INTRO")
 
 
 def _finalize_viewing(db_session, camera_state):

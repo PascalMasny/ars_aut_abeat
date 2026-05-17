@@ -90,20 +90,32 @@ body.camera-running [data-testid="stCustomComponentV1"]:nth-of-type(1) {{
 /* Setup-state styling: pin the picker to bottom-center, frame it in gold */
 body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) {{
     position: fixed !important;
-    bottom: 6vh; left: 50%;
-    transform: translateX(-50%);
-    width: min(48rem, 86vw) !important;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) !important;
+    width: min(56rem, 92vw) !important;
+    height: 88vh !important;
     z-index: 10002 !important;
     background: rgba(28,20,16,0.96) !important;
     border: 2px solid #C9A961 !important;
     border-radius: 6px !important;
-    padding: 0.6rem !important;
+    padding: 1.2rem !important;
     box-shadow: 0 0 40px rgba(201,169,97,0.35) !important;
+    overflow: visible !important;
+    display: flex !important;
+    flex-direction: column !important;
+}}
+body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) > * {{
+    flex: 1 1 auto !important;
+    height: 100% !important;
+    min-height: 0 !important;
 }}
 body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) iframe {{
     width: 100% !important;
-    min-height: 18vh !important;
+    height: 100% !important;
+    min-height: 560px !important;
     background: #0a0806 !important;
+    display: block !important;
+    border: 0 !important;
 }}
 
 /* ─── Overlay text on top of the video feed ─── */
@@ -114,7 +126,7 @@ body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) ifr
     top: 0;
     left: 50%;
     transform: translateX(-50%);
-    width: min(100vw, calc(100vh * 16 / 9));
+    width: min(100vw, calc(100vh * 112 / 199));
     height: 100vh;
     z-index: 10;
     pointer-events: none;
@@ -233,7 +245,7 @@ body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) ifr
     position: fixed !important;
     top: 0; left: 50%;
     transform: translateX(-50%);
-    width: min(100vw, calc(100vh * 16 / 9));
+    width: min(100vw, calc(100vh * 112 / 199));
     height: 100vh;
     background: var(--ink-black);
     z-index: 9999;
@@ -252,10 +264,12 @@ body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) ifr
     position: fixed;
     bottom: 0; left: 50%;
     transform: translateX(-50%);
-    width: min(100vw, calc(100vh * 16 / 9));
+    width: min(100vw, calc(100vh * 112 / 199));
     z-index: 10000;
-    background: linear-gradient(transparent, rgba(28,20,16,0.88) 25%, rgba(28,20,16,0.96));
-    padding: 3vh 6vw 3.5vh;
+    background: linear-gradient(transparent, rgba(28,20,16,0.88) 35%, rgba(28,20,16,0.97));
+    /* Slimmer top padding so the bars sit closer to the bottom edge and the
+       artwork (anchored toward the top of the frame) has more clear space. */
+    padding: 1vh 6vw 2vh;
     pointer-events: none;
 }}
 
@@ -556,7 +570,7 @@ body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) ifr
     position: fixed !important;
     top: 0; left: 50%;
     transform: translateX(-50%);
-    width: min(100vw, calc(100vh * 16 / 9));
+    width: min(100vw, calc(100vh * 112 / 199));
     height: 100vh;
     background: var(--ink-black);
     z-index: 9999;
@@ -604,6 +618,7 @@ body:not(.camera-running) [data-testid="stCustomComponentV1"]:nth-of-type(1) ifr
     0%, 100% {{ opacity: 1;    text-shadow: 0 0 40px rgba(201,169,97,0.45); }}
     50%       {{ opacity: 0.75; text-shadow: 0 0 80px rgba(201,169,97,0.25); }}
 }}
+
 </style>
 """.format(fonts=GOOGLE_FONTS_URL)
 

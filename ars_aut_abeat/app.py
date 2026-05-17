@@ -78,7 +78,7 @@ html, body {{ background: #1C1410; overflow: hidden; width: 100vw; height: 100vh
     position: fixed;
     top: 0; left: 50%;
     transform: translateX(-50%);
-    width: min(100vw, calc(100vh * 16 / 9));
+    width: min(100vw, calc(100vh * 112 / 199));
     height: 100vh;
     background: #1C1410;
     overflow: hidden;
@@ -87,6 +87,9 @@ html, body {{ background: #1C1410; overflow: hidden; width: 100vw; height: 100vh
     position: absolute; top: 0; left: 0;
     width: 100%; height: 100%;
     object-fit: contain;
+    /* Anchor the artwork toward the top so the live-emotion overlay at the
+       bottom has clear breathing room instead of overlapping the painting. */
+    object-position: center 18%;
 }}
 #img-b {{ opacity: 0; }}
 #frame-border {{
@@ -392,7 +395,13 @@ ctx = webrtc_streamer(
 )
 
 # ─── Consent gate: show welcome screen until camera is actually streaming ───
-camera_running = ctx is not None and ctx.state.playing
+# Latch: once the camera has played at least once this session, treat it as
+# running forever — otherwise transient `ctx.state.playing == False` flicker
+# during phase transitions makes the picker iframe (and its live preview) pop
+# back onto the screen during RECAP/FADE.
+if ctx is not None and ctx.state.playing:
+    st.session_state["_webrtc_ever_started"] = True
+camera_running = bool(st.session_state.get("_webrtc_ever_started"))
 if camera_running:
     # Once frames start flowing, tag <body> so theme.py collapses the picker.
     components.html(
@@ -405,42 +414,6 @@ else:
         "<script>window.parent.document.body.classList.remove('camera-running');</script>",
         height=0,
     )
-    st.markdown("""
-<div class="gallery-overlay" style="flex-direction:column;gap:1.5vh;
-            justify-content:flex-start;padding-top:8vh;">
-  <div style="position:absolute;top:8px;left:8px;right:8px;bottom:8px;
-              border:3px solid #C9A961;
-              box-shadow:0 0 0 1px #8B6F2E,inset 0 0 0 1px #8B6F2E,
-                         0 0 30px rgba(201,169,97,0.15);
-              pointer-events:none;"></div>
-
-  <div style="font-family:'Cinzel',serif;font-weight:700;
-              font-size:clamp(1.4rem,3.5vw,3rem);letter-spacing:0.3em;color:#C9A961;
-              text-shadow:0 3px 18px rgba(0,0,0,0.85);">
-    VALLIS · SIMVLACRI
-  </div>
-  <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
-              font-size:clamp(0.95rem,1.4vw,1.4rem);letter-spacing:0.2em;
-              color:#8B6F2E;margin-top:-0.5vh;">
-    The Valley of Likeness
-  </div>
-
-  <div style="font-family:'Cormorant Garamond',serif;
-              font-size:clamp(1rem,1.5vw,1.4rem);line-height:1.7;
-              color:#E0D0B0;max-width:42rem;text-align:center;margin:2vh 0;">
-    This installation reads your face to measure how you respond to the artwork.
-    <br/>No video is stored. All processing happens on this device.
-  </div>
-
-  <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
-              font-size:clamp(0.95rem,1.3vw,1.25rem);color:#8B6F2E;
-              text-align:center;max-width:36rem;margin:1vh auto 0;">
-    Use the panel below to select your camera and press <b>START</b>.
-    Your browser will ask permission. Once the camera is active this panel
-    disappears and the gallery begins.
-  </div>
-</div>
-""", unsafe_allow_html=True)
     st.stop()
 
 # Compatibility: code below used to gate on these flags; keep them set so any
@@ -471,7 +444,11 @@ camera_state = CameraState()
 if ctx.video_processor:
     processor: GalleryVideoProcessor = ctx.video_processor
     camera_state = processor.get_state()
-    processor.set_emotion_sampling(st.session_state.phase == "MORPHING")
+    # Warm the emotion model up early: start sampling at LOCKED/INTRO so the
+    # first inference (which loads weights) completes before MORPHING needs it.
+    processor.set_emotion_sampling(
+        st.session_state.phase in ("INTRO", "MORPHING")
+    )
     processor.set_pose_sampling(st.session_state.phase == "IDLE")
 
 # ─── State machine ────────────────────────────────────────────────────────────
@@ -593,12 +570,12 @@ if phase == "IDLE":
             status_icon = "◉"
             status_text = "VISITOR DETECTED"
             status_color = "#C9A961"
-            hint = "Read the panel. Raise both hands to accept and begin."
+            hint = "Raise both hands to accept and begin."
         else:
             status_icon = "◎"
             status_text = "APPROACH · BE SEEN"
             status_color = "#8B6F2E"
-            hint = "Stand before the glass and read the instructions."
+            hint = "Stand before the glass and raise both hands when ready."
 
         st.markdown(f"""
 <div class="mirror-overlay">
@@ -613,78 +590,6 @@ if phase == "IDLE":
       ❧ · · ❧
     </div>
   </div>
-
-  <aside class="howitworks-panel">
-
-    <div class="howitworks-title">VALLIS SIMULACRI</div>
-    <div style="font-family:'Cormorant Garamond',serif;font-style:italic;
-                font-size:clamp(0.8rem,0.95vw,1rem);color:#8B6F2E;
-                text-align:center;letter-spacing:0.1em;margin-bottom:0.7rem;">
-      The Valley of Likeness
-    </div>
-
-    <div class="howitworks-step" style="line-height:1.65;margin-bottom:0.7rem;">
-      In 1970, roboticist Masahiro Mori described the <em>uncanny valley</em>:
-      as a human likeness grows more realistic, our sense of familiarity rises —
-      until it crosses a threshold and plunges into revulsion. Almost human
-      is worse than not human at all.
-    </div>
-
-    <div class="howitworks-step" style="line-height:1.65;margin-bottom:0.8rem;">
-      This installation tests that threshold. A classical artwork is fed into
-      an AI, whose output is fed back in — again and again. Each cycle the
-      image drifts further from the original. Your face is read throughout.
-    </div>
-
-    <div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.6rem 0 0.7rem;"></div>
-
-    <div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.78vw,0.8rem);
-                letter-spacing:0.18em;color:#C9A961;margin-bottom:0.5rem;">
-      WHAT WILL HAPPEN
-    </div>
-    <div class="howitworks-step"><strong>I.</strong> A classical work appears before you</div>
-    <div class="howitworks-step"><strong>II.</strong> It morphs through 100 AI feedback loops over 30 seconds</div>
-    <div class="howitworks-step"><strong>III.</strong> Your facial micro-expressions are analysed in real time</div>
-    <div class="howitworks-step"><strong>IV.</strong> A Latin verdict and your emotional descent are revealed</div>
-
-    <div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.75rem 0 0.6rem;"></div>
-
-    <div style="font-family:'Cinzel',serif;font-size:clamp(0.6rem,0.78vw,0.8rem);
-                letter-spacing:0.18em;color:#C9A961;margin-bottom:0.5rem;">
-      TO BEGIN
-    </div>
-    <div class="howitworks-step" style="line-height:1.6;">
-      Stand within arm's reach of the screen.
-      When you are ready, <strong style="color:#E8C87A;">raise both hands</strong>
-      above your shoulders and hold them there for two seconds.
-      The experience lasts approximately one minute.
-    </div>
-
-    <div style="border-top:1px solid rgba(201,169,97,0.25);margin:0.75rem 0 0.6rem;"></div>
-
-    <div style="font-family:'Cinzel',serif;font-size:clamp(0.55rem,0.72vw,0.75rem);
-                letter-spacing:0.15em;color:#8B6F2E;margin-bottom:0.35rem;">
-      PRIVACY
-    </div>
-    <div class="howitworks-step" style="font-size:clamp(0.75rem,0.9vw,0.95rem);line-height:1.5;color:#8B9070;">
-      No video is recorded or stored. Emotion analysis runs locally on this
-      device. Only an anonymous score and aggregate statistics are saved.
-    </div>
-
-    <div style="background:rgba(139,34,34,0.18);border:1px solid rgba(139,34,34,0.45);
-                border-radius:4px;padding:0.5rem 0.7rem;margin-top:0.65rem;">
-      <div style="font-family:'Cinzel',serif;font-size:clamp(0.55rem,0.75vw,0.78rem);
-                  letter-spacing:0.15em;color:#CC6666;margin-bottom:0.25rem;">
-        &#9888; CONTENT WARNING
-      </div>
-      <div class="howitworks-step" style="color:#E0B0B0;margin:0;
-                  font-size:clamp(0.75rem,0.9vw,0.95rem);line-height:1.5;">
-        Images become progressively distorted. Some viewers find the results
-        unsettling. Raising both hands constitutes your consent to participate.
-      </div>
-    </div>
-
-  </aside>
 
   <!-- Bottom: status + plaque -->
   <div class="mirror-bottom">
@@ -720,31 +625,6 @@ if phase == "IDLE":
 """, unsafe_allow_html=True)
 
 # ─── Non-IDLE: full-screen overlay on top of webrtc ──────────────────────────
-elif phase == "LOCKED":
-    artwork = st.session_state.current_artwork
-    title = artwork["title"] if artwork else "..."
-    st.markdown(f"""
-<div class="gallery-overlay">
-  <div style="font-family:'Cinzel',serif; font-weight:700; font-size:clamp(1.1rem,3vw,2.2rem);
-              letter-spacing:0.3em; color:#C9A961;">VALLIS · SIMVLACRI</div>
-  <div style="color:#C9A961; font-size:clamp(0.9rem,1.3vw,1.4rem); letter-spacing:0.3em; opacity:0.7; margin:1rem 0;">❧ · · ❧</div>
-  <div style="border:3px solid #C9A961; border-radius:50%; padding:clamp(0.8rem,1.5vw,1.5rem) clamp(1.5rem,3vw,3rem);
-              box-shadow:0 0 40px rgba(201,169,97,0.35);">
-    <div style="font-family:'Cinzel',serif; font-weight:700; font-size:clamp(1rem,3vw,2rem);
-                letter-spacing:0.25em; color:#C9A961;">SPECTATOR IDENTIFIED</div>
-  </div>
-  <div style="color:#C9A961; font-size:clamp(0.9rem,1.3vw,1.4rem); letter-spacing:0.3em; opacity:0.7; margin:1rem 0;">❧ · · ❧</div>
-  <div style="font-family:'Cormorant Garamond',serif; font-style:italic; color:#E0D0B0;
-              font-size:clamp(1.1rem,1.8vw,1.8rem);">
-    Prepare thyself to confront —
-  </div>
-  <div style="font-family:'Cinzel',serif; font-weight:700; font-size:clamp(1.4rem,5vw,3.5rem);
-              color:#E8C87A; margin-top:0.5rem; text-align:center; padding:0 1rem;">
-    {title}
-  </div>
-</div>
-""", unsafe_allow_html=True)
-
 elif phase == "INTRO":
     artwork = st.session_state.current_artwork
     base_url = f"/app/static/frames/{artwork['slug']}/0000.png"
@@ -817,8 +697,14 @@ elif phase == "MORPHING":
 
     # Live emotion bars — separate Streamlit overlay, re-renders each tick on
     # top of the iframe (z-index higher than the iframe's 9999).
+    # Stable display order — no auto-sorting so bars don't jump around as
+    # values fluctuate. Matches the legend order in the RECAP line graph.
+    _EMOTION_ORDER = ("happy", "sad", "angry", "surprise", "fear", "disgust", "neutral")
     bars = ""
-    for eng, val in sorted(emotions.items(), key=lambda x: -x[1])[:5]:
+    for eng in _EMOTION_ORDER:
+        if eng not in emotions:
+            continue
+        val = emotions[eng]
         label_name = EMOTION_LATIN.get(eng, eng.capitalize())
         pct = round(val * 100, 1)
         bars += (
@@ -942,12 +828,7 @@ elif phase == "RECAP":
 """, unsafe_allow_html=True)
 
 elif phase == "FADE":
-    st.markdown("""
-<div class="gallery-overlay">
-  <div style="font-family:'Cinzel',serif; font-weight:700; font-size:clamp(2rem,4vw,3rem);
-              letter-spacing:0.3em; color:#8B6F2E;">
-    THE VALLEY AWAITS THE NEXT SOUL
-  </div>
-  <div style="color:#C9A961; font-size:4rem; margin-top:1rem; opacity:0.6;">⚜</div>
-</div>
-""", unsafe_allow_html=True)
+    # FADE was removed; state machine now jumps RECAP → IDLE. This branch
+    # exists only so an in-flight FADE session doesn't crash before the next
+    # rerun resets it.
+    pass
