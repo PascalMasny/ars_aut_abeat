@@ -50,6 +50,20 @@ The visitor is not looking at a distorted photograph of a real person. They are 
 
 ---
 
+## Model Collapse as Artistic Medium
+
+The process that produces the degradation sequences has a name in the research literature: **model collapse**.
+
+When an AI model's own output is used as input for the next generation — recursively, without fresh grounding in reality — two things happen simultaneously. First, the model reinforces its own statistical biases. Features that were already overrepresented in its training data become more dominant with each pass; features that were rare or idiosyncratic are gradually erased. Second, generation artefacts — the subtle errors and hallucinations inherent in any imperfect model — compound. Each iteration inherits the distortions of the last and adds its own.
+
+The result is not random degradation. It is *directed* degradation: the image drifts toward the model's internal prototype of a human body. Faces become more symmetrical than any real face. Skin textures smooth toward an idealised average. Proportions correct themselves against a learned norm. And yet artefacts accumulate in the opposite direction — the light grows wrong, edges soften where they should be sharp, details multiply where they should simplify.
+
+This is model collapse used deliberately. Where AI safety researchers identify it as a failure mode to be avoided, *Vallis Simulacri* treats it as a compositional tool. The hundred-frame sequence does not degrade randomly — it traces a specific trajectory: from human original, through machine-idealised average, toward something that is simultaneously more and less human than either.
+
+The visitor watches this trajectory unfold in real time. What they are seeing is not corruption. It is the model showing, iteration by iteration, the distance between its representation and the reality it was trained to approximate. That distance, made visible, is the uncanny valley.
+
+---
+
 ## The Philosophy
 
 **Masahiro Mori** first described the uncanny valley in 1970: as a human likeness becomes more realistic, our sense of familiarity increases — until it crosses a threshold and plunges into discomfort. The graph of familiarity versus realism drops sharply before rising again at perfect realism. That drop is the valley.

@@ -166,15 +166,41 @@ score = Σ(emotion_probability × weight)   normalized to [0, 1]
 
 ## Installation & Dependencies
 
+### Ubuntu / Linux (recommended: Ubuntu 22.04+)
+
+Run the installer once after cloning. It installs system packages, creates a
+Python venv, installs pip dependencies, installs Node.js, and optionally
+installs Brave Browser for kiosk mode.
+
 ```bash
-# Python 3.10+ required
+cd ars_aut_abeat
+chmod +x install.sh start.sh dev.sh stop.sh
+./install.sh
+```
+
+The installer:
+- Installs `libgl1-mesa-glx`, `libglib2.0-0`, and other OpenCV/MediaPipe system deps
+- Creates `.venv/` with the correct Python version (prefers 3.12 → 3.11 → 3.10)
+- Adds your user to the `video` group for camera access (log out/in once)
+- Installs Node.js 20 via NodeSource if not already present
+- Installs Brave Browser for kiosk (pass `--no-browser` to skip)
+
+To skip Brave installation (e.g. Chromium already present):
+```bash
+./install.sh --no-browser
+```
+
+### macOS
+
+```bash
+# Python 3.10–3.12 required (mediapipe does not support 3.14 yet)
 pip install -r requirements.txt
 
 # Node 18+ required
 cd frontend && npm install
 ```
 
-### macOS SSL fix (run once if MediaPipe model download fails)
+#### macOS SSL fix (run once if MediaPipe model download fails)
 
 ```bash
 /Applications/Python\ 3.x/Install\ Certificates.command

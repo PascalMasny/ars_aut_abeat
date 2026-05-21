@@ -76,9 +76,19 @@ save source as 0000.png
 
 The `strength` parameter (0.45) controls how aggressively each iteration changes the image. At 0.45 each frame drifts slightly; over 100 iterations the cumulative drift produces pronounced uncanny distortion while preserving enough of the original composition to remain recognisable.
 
-### Why this produces uncanny imagery
+### Why this produces uncanny imagery — model collapse
 
-Stable Diffusion learns a statistical model of *plausible* images. When iterated with a human-figure prompt, it repeatedly nudges the image toward the average human face in its training distribution — smoothing individual features, symmetrising asymmetries, and homogenising texture. The result is a face that is recognisably human but subtly wrong: too smooth, too symmetrical, proportions slightly off. These are precisely the attributes that trigger uncanny valley responses in viewers.
+This feedback loop is a controlled instance of **model collapse**: the well-documented failure mode where iterative use of a model's own outputs as inputs causes progressive drift away from the original data distribution.
+
+In practice two processes run in parallel:
+
+1. **Regression to the model's prototype.** Stable Diffusion's training distribution has a strong prior on what a human face looks like — symmetrical, smooth, proportions near the statistical mean. Each img2img pass nudges the image slightly toward that prior. Individual features erode. Asymmetries that make a face human are symmetrised. Skin texture homogenises.
+
+2. **Hallucination accumulation.** Every generation introduces small artefacts — sub-pixel errors in lighting, ambiguous edge reconstructions, detail that was inferred rather than copied. These artefacts are real pixels in the next iteration's input; the model treats them as ground truth and elaborates on them. By iteration 30–50, compound artefacts are clearly visible; by iteration 100, whole regions of the image may be structurally unrecognisable from the source.
+
+The combination — regression toward an average *and* accumulation of artefacts — is what produces specifically uncanny distortion rather than generic noise. The image remains recognisably human (regression keeps the structure) while becoming deeply wrong (hallucinations corrupt the detail). This is the operating principle of the piece.
+
+Note: increasing `STRENGTH` above ~0.6 collapses the image to noise within ~30 iterations because hallucination accumulation outpaces structural regression. The default of 0.45 is tuned to keep both processes roughly in balance across all 100 iterations.
 
 ### Prompt generation (LLaVA)
 

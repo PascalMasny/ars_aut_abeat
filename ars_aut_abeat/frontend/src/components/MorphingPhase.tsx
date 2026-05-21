@@ -11,6 +11,25 @@ const EMOTION_LATIN: Record<string, string> = {
   surprise: 'Surprise', fear: 'Fear', disgust: 'Disgust', neutral: 'Neutral',
 }
 
+// Preload cache: persists for page lifetime so the browser never re-decodes
+// a frame that was already fetched. Assigning a decoded Image's src to an
+// <img> element is instantaneous — no blank-frame gap → no camera bleed.
+const frameCache = new Map<string, HTMLImageElement>()
+
+function warmFrame(slug: string, idx: number): HTMLImageElement {
+  const key = `${slug}:${idx}`
+  if (!frameCache.has(key)) {
+    const img = new Image()
+    img.src = `/frames/${slug}/${String(idx).padStart(4, '0')}.png`
+    frameCache.set(key, img)
+  }
+  return frameCache.get(key)!
+}
+
+function isReady(img: HTMLImageElement) {
+  return img.complete && img.naturalWidth > 0
+}
+
 export function MorphingPhase({ state }: Props) {
   const { artwork, emotions, phase_started_at, phase_duration } = state
   const rafRef = useRef<number | null>(null)
@@ -22,11 +41,16 @@ export function MorphingPhase({ state }: Props) {
   const totalFrames = artwork?.total_frames ?? 100
   const slug = artwork?.slug ?? ''
 
-  // Pin frame 0 synchronously before first paint — eliminates the one-frame
-  // gap where imgA has no src and the camera would show through.
+  // Pin frame 0 before first paint. Use preload cache: if already decoded,
+  // assignment is synchronous; otherwise wait for onload — either way no blank.
   useLayoutEffect(() => {
     if (!slug || !imgARef.current) return
-    imgARef.current.src = `/frames/${slug}/0000.png`
+    const f0 = warmFrame(slug, 0)
+    // Also warm frame 1 so the first crossfade has no stall
+    warmFrame(slug, 1)
+    const apply = () => { if (imgARef.current) imgARef.current.src = f0.src }
+    if (isReady(f0)) apply()
+    else f0.addEventListener('load', apply, { once: true })
   }, [slug])
 
   // rAF crossfade loop — driven by wall-clock time anchored to phase_started_at.
@@ -54,17 +78,25 @@ export function MorphingPhase({ state }: Props) {
       const ni = Math.min(ci + 1, totalFrames)
       const blend = raw - Math.floor(raw)
 
+      // Preload current + next 3 frames so they're decoded before needed
+      for (let a = 0; a <= 3; a++) warmFrame(slug, Math.min(ci + a, totalFrames))
+
+      const fA = warmFrame(slug, ci)
+      const fB = warmFrame(slug, ni)
+
       const imgA = imgARef.current
       const imgB = imgBRef.current
       if (!imgA || !imgB) return
 
-      if (ci !== curIdx) {
+      // Only swap src once the new frame is fully decoded — prevents the
+      // blank-element flash that lets the camera background bleed through.
+      if (ci !== curIdx && isReady(fA)) {
         curIdx = ci
-        imgA.src = `/frames/${slug}/${String(ci).padStart(4, '0')}.png`
+        imgA.src = fA.src
       }
-      if (ni !== nextIdx) {
+      if (ni !== nextIdx && isReady(fB)) {
         nextIdx = ni
-        imgB.src = `/frames/${slug}/${String(ni).padStart(4, '0')}.png`
+        imgB.src = fB.src
       }
 
       imgA.style.opacity = String((1 - blend).toFixed(3))

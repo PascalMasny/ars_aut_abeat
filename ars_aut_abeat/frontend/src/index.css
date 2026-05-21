@@ -382,6 +382,7 @@ html, body, #root {
   inset: 0;
   z-index: 9;
   overflow: hidden;
+  background: #0a0806;
 }
 
 .morphing-img {

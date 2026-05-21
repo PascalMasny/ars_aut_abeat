@@ -30,6 +30,7 @@ ars_aut_abeat/static/frames
 
 # Generated image sequences — up to 100 frames per artwork, can exceed 10 GB
 uncanny_maker/catalog_iterations/
+uncanny_maker/catalog_collapse/
 uncanny_maker/catalog_uncanny/
 uncanny_maker/_archive/catalog_iterations_wrong/
 uncanny_maker/_archive/catalog_uncanny/
