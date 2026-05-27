@@ -1,27 +1,51 @@
 # Vallis Simulacri
-### *The Valley of Likeness* — An Interactive Gallery Installation
+### *The Valley of Likeness* — Interactive Gallery Installation
 
 > *At what point does a human find their own species wrong?*
 
-**Vallis Simulacri** takes classical paintings and sculptures of the human figure and feeds them into an AI — then feeds the output back in again, one hundred times. Each cycle the image drifts further from the original. Features smooth. Proportions shift. Something that was familiar becomes wrong.
+---
 
-The visitor watches this happen. Their face is read throughout, silently, at ten frames per second. The micro-expressions they cannot control — the involuntary flickers of disgust and fear — are recorded and scored. At the end, a verdict is rendered.
+## TL;DR — What this project does (for the confused colleague)
 
-The installation is not about AI. It is about the human nervous system: its extraordinary sensitivity to the human body, and the precise moment that sensitivity becomes alarm. The AI is just the instrument. The subject is *you*.
+**In one sentence:** Visitors stand in front of a giant screen, raise their hands, and watch a classical painting get slowly distorted by AI while their facial micro-expressions are silently recorded; at the end a "verdict" tells them how far they fell into the uncanny valley.
 
-See [`docs/CONCEPT.md`](docs/CONCEPT.md) for the full philosophical framing.
+**What runs:** A FastAPI + React web app on a PC connected to a camera. The browser captures video, sends frames over WebSocket to a Python backend, which runs face/emotion analysis in real time, drives a state machine through four phases, and pushes results back to the frontend.
+
+**How the distorted images are made:** A one-time offline pipeline (`uncanny_maker`) runs each painting through Stable Diffusion img2img 100 times in a feedback loop — each output becomes the next input. Errors compound; the result is a body that is simultaneously too-human and deeply wrong.
+
+**What "uncanny valley" means here:** Roboticist Masahiro Mori (1970) described how a near-perfect human likeness triggers revulsion more than a clearly non-human one. We measure that response in real visitors, one face at a time.
 
 ---
 
-Visitors stand before a screen showing a classical artwork. By raising both hands they initiate a 30-second session: the image morphs through AI-driven distortion while MediaPipe facial analysis silently records their emotional response at 10 Hz. At the end a wax-seal verdict in Latin is rendered:
+## The Experience (Visitor Perspective)
 
-| Verdict | Latin meaning | Score |
-|---------|--------------|-------|
-| **VALLIS** | *The valley* — deep uncanny reaction | ≥ 0.60 |
-| **LIMEN** | *The threshold* — ambivalent response | 0.40 – 0.60 |
-| **FIRMA** | *Solid ground* — no significant reaction | < 0.40 |
-
-The installation runs autonomously on a looped kiosk, collects anonymous viewing data, and builds a crowd-level record of collective response for each artwork in the catalog.
+```
+ IDLE        65-inch portrait TV shows a mirror view of visitors.
+             Aggregate data from previous visitors scrolls past every 30 s.
+               │
+               │  visitor raises both hands for 1.5 s
+               ▼
+ INTRO       "THIS IS — [artwork title]"
+             Full-screen original painting for 8 s.
+             Text: "We will now give this picture to an AI. It will try to
+             recreate the same picture — over 100 times."
+               │
+               ▼
+ MORPHING    The painting slowly transforms through 100 AI-distorted frames (30 s).
+             Live emotion bars (happy, sad, fear, disgust, …) float on the right —
+             the visitor can see their face being read in real time.
+               │
+               ▼
+ RECAP       Before/after thumbnails side by side.
+             Emotion-over-time line chart.
+             A wax-seal verdict:
+               VALLIS  — you fell into the valley
+               LIMEN   — you stood at the threshold
+               FIRMA   — you held your ground
+               │
+               ▼
+ IDLE        Resets. Waits for the next visitor.
+```
 
 ---
 
@@ -29,92 +53,97 @@ The installation runs autonomously on a looped kiosk, collects anonymous viewing
 
 ```
 .
-├── ars_aut_abeat/          Interactive gallery application (Streamlit + WebRTC)
-│   ├── app.py              Entrypoint — state machine driver and UI renderer
-│   ├── config.py           All tunable parameters (timings, thresholds, weights)
-│   ├── core/               State machine, session model, verdict scoring
-│   ├── vision/             MediaPipe emotion detection and gaze analysis
-│   ├── data/               SQLAlchemy ORM, SQLite persistence, analytics
-│   ├── catalog/            Artwork loader — maps source images to frame sequences
-│   ├── ui/                 CSS theme (parchment, gilded frames, wax seals)
-│   └── tests/              Unit tests for scoring and gaze thresholds
+├── ars_aut_abeat/          Real-time gallery application (FastAPI + React/Vite)
+│   ├── backend/            FastAPI server: WebSocket handler, graph generation
+│   ├── core/               Phase state machine, per-session data, verdict scoring
+│   ├── vision/             MediaPipe emotion detection, head-pose gaze gate
+│   ├── catalog/            Artwork loader — maps source images to 100-frame sequences
+│   ├── data/               SQLAlchemy ORM, SQLite persistence, aggregate analytics
+│   ├── frontend/           React + TypeScript + Vite UI
+│   │   └── src/
+│   │       ├── hooks/      useWebSocket.ts, useCamera.ts
+│   │       └── components/ IdlePhase, IntroPhase, MorphingPhase, RecapPhase
+│   ├── start.sh            Production launcher (builds frontend, starts server, opens kiosk)
+│   ├── install.sh          One-time Ubuntu/Debian setup
+│   └── config.py           All tunable parameters (timings, thresholds, weights)
 │
-├── uncanny_maker/          Offline preprocessing pipeline
-│   ├── iterate_degrade.py  Main script — 100-frame iterative AI degradation
-│   ├── download_human_figures.py  Met Museum API scraper (~200 artworks)
+├── uncanny_maker/          Offline preprocessing pipeline (run once)
+│   ├── iterate_degrade.py  Main script — 100-frame iterative Stable Diffusion loop
+│   ├── download_human_figures.py  Met Museum API scraper
 │   ├── core/               Stable Diffusion img2img + LLaVA prompt generation
-│   └── catalog/            Source artwork images (downloaded by scraper)
+│   └── catalog/            Source artwork JPEGs (downloaded by scraper)
 │
-├── _prototypes/            Early experiments (not production)
-└── docs/                   Extended technical documentation
-    ├── ARCHITECTURE.md     System architecture and design decisions
-    └── PIPELINE.md         Preprocessing pipeline — how degradation works
+├── _prototypes/            Early experiments (not production code)
+└── docs/
+    ├── CONCEPT.md          Philosophy, the uncanny valley, model collapse as art
+    ├── ARCHITECTURE.md     Technical architecture, data flow, all modules explained
+    └── PIPELINE.md         Preprocessing pipeline — how the 100-frame sequences are made
 ```
 
 ---
 
 ## Quick Start
 
-### Gallery Application
+### Prerequisites
+
+- Python 3.10–3.12 (MediaPipe does not support 3.13+ yet)
+- Node.js 18+
+- A webcam
+- Brave Browser, Chrome, or Chromium (for kiosk mode)
+
+### Ubuntu / Linux (recommended for the actual installation)
+
+```bash
+cd ars_aut_abeat
+chmod +x install.sh start.sh
+./install.sh          # one-time setup: Python venv, Node, system libs, browser
+./start.sh            # builds frontend + starts server + opens kiosk browser
+```
+
+### macOS (development)
 
 ```bash
 cd ars_aut_abeat
 pip install -r requirements.txt
-
-# macOS only — fix SSL certificates for MediaPipe model download
-/Applications/Python\ 3.x/Install\ Certificates.command
-
-streamlit run app.py
-# → http://localhost:8501
+cd frontend && npm install && cd ..
+./start.sh
 ```
 
-On first launch MediaPipe downloads two model files (~300 MB total). After that the app is fully offline.
+Open `http://localhost:8000` in your browser.
 
-Developer overlay (camera debug + manual frame scrubber):
+> **First run note:** MediaPipe downloads two model files (~20 MB each) on first startup.
+> The app loads immediately; face detection becomes active ~10–30 s later.
+
+### Development mode (hot reload)
+
+```bash
+./dev.sh    # uvicorn with --reload + Vite HMR in parallel
+            # frontend: http://localhost:5173 (proxies /ws and /frames to :8000)
 ```
-http://localhost:8501/?dev=1
-```
 
-### Preprocessing Pipeline
+---
 
-Run once before the first installation session to build the artwork catalog and generate degradation sequences.
+## How the Artwork Images Are Made (Offline Pipeline)
+
+Run once before the installation. Requires a GPU (Apple M-series MPS, NVIDIA CUDA, or slow CPU).
 
 ```bash
 cd uncanny_maker
 pip install -r requirements.txt
 
-# Step 1 — download source artworks from Met Museum Open Access
+# Step 1 — download ~200 figurative paintings/sculptures from Met Museum Open Access
 python download_human_figures.py
 
-# Step 2 — generate 100-frame degradation sequences with Stable Diffusion
-#           Ollama + LLaVA is optional; falls back to a generic prompt automatically
-ollama serve  # optional, in a separate terminal
+# Step 2 — run each image through 100 Stable Diffusion feedback iterations
+ollama serve &          # optional — provides better prompts via LLaVA
 python iterate_degrade.py
 ```
 
-Both scripts are fully resumable — interrupted runs continue from where they stopped.
+Output: `uncanny_maker/catalog_iterations/{artwork_slug}/0000.png … 0100.png`
 
----
+Both scripts are **fully resumable** — interrupted runs continue from where they stopped.
 
-## How the Interaction Works
-
-```
- IDLE          Kiosk mirror view; waits for a visitor
-   │
-   │  both hands raised ≥ 1.5 s
-   ▼
- LOCKED        "SPECTATOR IDENTIFIED" — artwork title revealed (2.5 s)
-   │
-   ▼
- MORPHING      Image degrades through 100 AI-generated frames (30 s)
-               Emotions sampled at 10 Hz via MediaPipe blendshapes
-   │
-   ▼
- RECAP         Verdict seal + emotion timeline + crowd concordance (15 s)
-   │
-   ▼
- FADE          "THE VALLEY AWAITS THE NEXT SOUL" (3 s) → IDLE
-```
+Estimated time per artwork: ~8–12 min on Apple M-series, ~3–6 min on NVIDIA GPU.
 
 ---
 
@@ -122,30 +151,72 @@ Both scripts are fully resumable — interrupted runs continue from where they s
 
 | Layer | Technology |
 |-------|-----------|
-| UI framework | Streamlit + streamlit-webrtc |
-| Computer vision | MediaPipe FaceLandmarker (52 FACS blendshapes) + PoseLandmarker |
-| Head pose | OpenCV `solvePnP` |
+| Backend | FastAPI + Uvicorn |
+| Frontend | React 18 + TypeScript + Vite |
+| Camera transport | WebSocket binary (JPEG frames, browser → server) |
+| Computer vision | MediaPipe FaceLandmarker (52 FACS blendshapes) |
+| Pose detection | MediaPipe PoseLandmarker (hands-raised trigger) |
+| Head pose | OpenCV `solvePnP` (gaze gate: yaw ≤ 35°, pitch ≤ 30°) |
 | Image generation | Stable Diffusion v1.5 via Hugging Face `diffusers` |
-| Vision LLM | LLaVA via Ollama (optional) |
+| Vision LLM | LLaVA via Ollama (optional — improves SD prompts) |
 | Database | SQLite via SQLAlchemy 2.0 |
-| Art source | Met Museum Open Access API |
+| Charts | Matplotlib → base64 PNG |
+| Art source | Met Museum Open Access API (public domain) |
+| Display | 65-inch TV, portrait orientation (112:199 aspect ratio) |
+
+---
+
+## Verdict System
+
+At the end of each 30-second session the visitor's emotion samples are averaged and scored:
+
+```
+score = normalize( Σ (emotion_probability × weight) )   →   [0, 1]
+```
+
+| Emotion | Weight | Rationale |
+|---------|--------|-----------|
+| Disgust | +1.0 | Core uncanny signal |
+| Fear | +0.9 | Threat response |
+| Surprise | +0.4 | Ambiguous |
+| Sad | +0.2 | Mild negative |
+| Angry | −0.1 | Neutral |
+| Neutral | −0.4 | No reaction |
+| Happy | −1.0 | Counter-signal |
+
+| Score | Verdict | Meaning |
+|-------|---------|---------|
+| ≥ 0.60 | **VALLIS** | Fell into the uncanny valley |
+| 0.40 – 0.59 | **LIMEN** | At the threshold |
+| < 0.40 | **FIRMA** | Unaffected, stable ground |
+
+---
+
+## Privacy
+
+- No video is stored anywhere.
+- Emotion analysis runs entirely on the installation hardware.
+- Only anonymous numerical scores are written to the database (no images, no identity).
+- The visitor initiates by raising both hands — a deliberate consent gesture.
 
 ---
 
 ## Documentation
 
-- [`docs/CONCEPT.md`](docs/CONCEPT.md) — Philosophy, core idea, and what the installation sets out to achieve
-- [`ars_aut_abeat/README.md`](ars_aut_abeat/README.md) — Full gallery app reference (architecture, config, installation, DB schema)
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — System design, threading model, emotion scoring
-- [`docs/PIPELINE.md`](docs/PIPELINE.md) — Preprocessing pipeline, degradation algorithm, LLaVA integration
+| File | Contents |
+|------|----------|
+| [`docs/CONCEPT.md`](docs/CONCEPT.md) | Philosophy — uncanny valley, model collapse as artistic medium, Freud, Mori |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System design, WebSocket protocol, vision pipeline, all modules |
+| [`docs/PIPELINE.md`](docs/PIPELINE.md) | Preprocessing pipeline — Stable Diffusion loop, LLaVA, degradation mechanics |
+| [`ars_aut_abeat/README.md`](ars_aut_abeat/README.md) | App-level reference: quick start, config, state machine, DB schema |
 
 ---
 
 ## Design Language
 
-The visual identity is deliberately anachronistic: a 21st-century computer vision experiment dressed in the aesthetic of a 17th-century cabinet of curiosities.
+Deliberately anachronistic — a 21st-century computer-vision experiment dressed as a 17th-century cabinet of curiosities.
 
-- **Typography**: Cinzel (inscriptions), Cormorant Garamond (body), Pinyon Script (flourishes)
-- **Palette**: Ink black `#1C1410` · Parchment `#F4E8D0` · Gold `#C9A961` · Burgundy `#6B2C2C`
-- **Motifs**: Gilded frames, wax seals, filigree dividers, parchment scroll textures
-- **Layout**: 16:9 centered; all text sizes scale from phone to beamer via CSS `clamp()`
+- **Fonts:** Cinzel (inscriptions), Cormorant Garamond (body text), Pinyon Script (flourishes)
+- **Palette:** Ink black `#1C1410` · Parchment `#F4E8D0` · Gold `#C9A961` · Burgundy `#6B2C2C`
+- **Layout:** `112:199` portrait column centred on the landscape display with black bars
+- **Text scale:** CSS `clamp()` throughout — readable from phone screen to 65-inch projection
