@@ -22,7 +22,7 @@ UNCANNY_60_DIR = _UNCANNY_ROOT / "catalog_uncanny" / "60"
 UNCANNY_80_DIR = _UNCANNY_ROOT / "catalog_uncanny" / "80"
 
 # Animation
-FRAME_COUNT = 100   # 0000 = original + 0001…0100 = degradation frames
+FRAME_COUNT = 50    # 0000 = original + 0001…0050 = degradation frames
 
 # Vision
 EMOTION_SAMPLE_RATE_HZ    = 10

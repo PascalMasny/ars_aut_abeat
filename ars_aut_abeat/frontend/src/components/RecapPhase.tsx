@@ -21,30 +21,31 @@ export function RecapPhase({ state }: Props) {
   const sc = SEAL_COLORS[verdict] ?? '#C9A961'
 
   return (
-    <div className="recap-overlay">
-      <div className="gilt-border" />
-
-      <div className="recap-header">
-        <div className="recap-section-label">YOUR EMOTIONAL DESCENT</div>
-        <div className="recap-artwork-name">{artwork.title}</div>
-      </div>
-
-      <div className="recap-thumbnails">
-        <div>
-          <div className="recap-thumb-label">ORIGINAL</div>
-          <div className="recap-thumb-frame">
-            <img src={firstUrl} alt="original" />
-          </div>
-        </div>
-        <div>
-          <div className="recap-thumb-label">AFTER 100 ITERATIONS</div>
-          <div className="recap-thumb-frame">
-            <img src={lastUrl} alt="final frame" />
+    <div className="phase-layout">
+      <div className="phase-left">
+        <div className="recap-left">
+          <div className="recap-thumbnails">
+            <div>
+              <div className="recap-thumb-label">ORIGINAL</div>
+              <div className="recap-thumb-frame">
+                <img src={firstUrl} alt="original" />
+              </div>
+            </div>
+            <div>
+              <div className="recap-thumb-label">AFTER 50 ITERATIONS</div>
+              <div className="recap-thumb-frame">
+                <img src={lastUrl} alt="final frame" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
+      <div className="phase-right">
+        <div className="recap-header">
+          <div className="recap-section-label">YOUR EMOTIONAL DESCENT</div>
+          <div className="recap-artwork-name">{artwork.title}</div>
+        </div>
 
-      <div style={{ width: '100%', flexShrink: 0, marginBottom: '1.5vh' }}>
         {recap_graph ? (
           <img
             className="recap-graph"
@@ -58,22 +59,23 @@ export function RecapPhase({ state }: Props) {
             textAlign: 'center',
             padding: '1rem',
             fontFamily: "'Cormorant Garamond', serif",
+            fontSize: 'clamp(0.8rem,1.6vh,1.2rem)',
           }}>
             No emotion data recorded.
           </div>
         )}
-      </div>
 
-      <div className="recap-seal-row">
-        <div
-          className="seal-medallion"
-          style={{
-            border: `5px solid ${sc}`,
-            background: `radial-gradient(circle at 40% 35%, ${sc}66, ${sc}22)`,
-            color: sc,
-          }}
-        >
-          {verdict}
+        <div className="recap-seal-row">
+          <div
+            className="seal-medallion"
+            style={{
+              border: `5px solid ${sc}`,
+              background: `radial-gradient(circle at 40% 35%, ${sc}66, ${sc}22)`,
+              color: sc,
+            }}
+          >
+            {verdict}
+          </div>
         </div>
       </div>
     </div>

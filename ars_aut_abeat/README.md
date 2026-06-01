@@ -40,11 +40,11 @@ ars_aut_abeat/
 │       │   ├── useCamera.ts      ← getUserMedia, 10 Hz canvas capture
 │       │   └── useWebSocket.ts   ← persistent WS, auto-reconnect, ServerState
 │       └── components/
-│           ├── CameraBackground.tsx  ← always mounted, no phase flicker
-│           ├── IdlePhase.tsx         ← mirror overlay + attract screen
-│           ├── IntroPhase.tsx        ← artwork reveal + frame preloading
-│           ├── MorphingPhase.tsx     ← rAF crossfade over 100 frames
-│           └── RecapPhase.tsx        ← before/after thumbnails, graph, seal
+│           ├── CameraBackground.tsx  ← always mounted, drives 10 Hz capture
+│           ├── IdlePhase.tsx         ← left: camera mirror; right: status / attract content
+│           ├── IntroPhase.tsx        ← left: artwork image; right: AI explanation text
+│           ├── MorphingPhase.tsx     ← left: 50-frame rAF crossfade; right: live emotion bars
+│           └── RecapPhase.tsx        ← left: before/after thumbnails; right: graph + verdict seal
 ├── core/
 │   ├── state_machine.py  ← InstallationState dataclass, phase FSM
 │   ├── session.py        ← ViewerSession (per-visitor emotion samples)
@@ -78,7 +78,7 @@ IDLE → INTRO (8 s) → MORPHING (30 s) → RECAP (15 s) → IDLE
 |-------|----------|---------|
 | **IDLE** | Indefinite | Both hands raised ≥ 1.5 s |
 | **INTRO** | 8 s | Timer — artwork reveal, frames preloaded |
-| **MORPHING** | 30 s | Timer — 100-frame rAF crossfade, live emotion bars |
+| **MORPHING** | 30 s | Timer — 50-frame rAF crossfade, live emotion bars |
 | **RECAP** | 15 s | Timer — before/after thumbnails, emotion graph, verdict seal |
 
 All durations are tunable in `config.py`.
@@ -224,7 +224,7 @@ cd frontend && npm install
 | `MIN_FACE_AREA_FRACTION` | 0.01 | Minimum face bbox area |
 | `VERDICT_VALLIS_THRESHOLD` | 0.60 | Score ≥ this = VALLIS |
 | `VERDICT_FIRMA_THRESHOLD` | 0.40 | Score < this = FIRMA |
-| `FRAME_COUNT` | 100 | Degradation frames per artwork |
+| `FRAME_COUNT` | 50 | Degradation frames per artwork (0000 = original, 0001–0050) |
 
 ---
 
@@ -256,8 +256,8 @@ SQLite at `data/gallery.db`. Auto-created on first run.
 
 **Fonts:** Cinzel (titles), Cormorant Garamond (body), Pinyon Script (flourishes) — Google Fonts  
 **Palette:** Ink black `#1C1410`, parchment `#F4E8D0`, gold `#C9A961`, burgundy `#6B2C2C`  
-**Aspect ratio:** `112:199` (portrait column) — centred on landscape display with black bars  
-**All text sized for projection** — `clamp()` from ~1rem (phone) to 4rem (beamer)
+**Layout:** `16:9` landscape — camera feed left (58%), info panel right (42%). Letterboxed on non-16:9 screens.  
+**All text sized for projection** — `clamp()` with `vh`-based fluid values; panel never overflows regardless of screen size.
 
 ---
 

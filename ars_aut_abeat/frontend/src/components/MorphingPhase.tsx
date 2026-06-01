@@ -11,9 +11,6 @@ const EMOTION_LATIN: Record<string, string> = {
   surprise: 'Surprise', fear: 'Fear', disgust: 'Disgust', neutral: 'Neutral',
 }
 
-// Preload cache: persists for page lifetime so the browser never re-decodes
-// a frame that was already fetched. Assigning a decoded Image's src to an
-// <img> element is instantaneous — no blank-frame gap → no camera bleed.
 const frameCache = new Map<string, HTMLImageElement>()
 
 function warmFrame(slug: string, idx: number): HTMLImageElement {
@@ -41,29 +38,21 @@ export function MorphingPhase({ state }: Props) {
   const totalFrames = artwork?.total_frames ?? 100
   const slug = artwork?.slug ?? ''
 
-  // Pin frame 0 before first paint. Use preload cache: if already decoded,
-  // assignment is synchronous; otherwise wait for onload — either way no blank.
   useLayoutEffect(() => {
     if (!slug || !imgARef.current) return
     const f0 = warmFrame(slug, 0)
-    // Also warm frame 1 so the first crossfade has no stall
     warmFrame(slug, 1)
     const apply = () => { if (imgARef.current) imgARef.current.src = f0.src }
     if (isReady(f0)) apply()
     else f0.addEventListener('load', apply, { once: true })
   }, [slug])
 
-  // rAF crossfade loop — driven by wall-clock time anchored to phase_started_at.
   useEffect(() => {
     if (!slug) return
 
     let curIdx = -1
     let nextIdx = -1
 
-    // Piecewise easing: frames 0–5 (original → first AI distortions) occupy
-    // the first 50% of total duration (~15 s each frame ≈ 3 s visible).
-    // Frames 5–100 race through the remaining 50% so the full degradation arc
-    // is seen without the end feeling rushed.
     const SLOW_FRAMES = 5
     const SLOW_SPLIT  = 0.50
 
@@ -78,7 +67,6 @@ export function MorphingPhase({ state }: Props) {
       const ni = Math.min(ci + 1, totalFrames)
       const blend = raw - Math.floor(raw)
 
-      // Preload current + next 3 frames so they're decoded before needed
       for (let a = 0; a <= 3; a++) warmFrame(slug, Math.min(ci + a, totalFrames))
 
       const fA = warmFrame(slug, ci)
@@ -88,8 +76,6 @@ export function MorphingPhase({ state }: Props) {
       const imgB = imgBRef.current
       if (!imgA || !imgB) return
 
-      // Only swap src once the new frame is fully decoded — prevents the
-      // blank-element flash that lets the camera background bleed through.
       if (ci !== curIdx && isReady(fA)) {
         curIdx = ci
         imgA.src = fA.src
@@ -116,50 +102,51 @@ export function MorphingPhase({ state }: Props) {
 
   if (!artwork) return null
 
+  const visibleEmotions = EMOTION_ORDER.filter((k) => k in emotions)
+
   return (
-    <div className="morphing-container">
-      {/* imgA gets its initial src set via useLayoutEffect before first paint */}
-      <img ref={imgARef} className="morphing-img" alt="" />
-      <img ref={imgBRef} className="morphing-img" style={{ opacity: 0 }} alt="" />
-
-      <div className="gilt-border" />
-
-      <div className="morphing-top">
-        <div className="morphing-title">{artwork.title}</div>
-        <div className="morphing-frame-label">{frameLabel}</div>
+    <div className="phase-layout">
+      <div className="phase-left" style={{ background: '#0a0806' }}>
+        <img ref={imgARef} className="morphing-img" alt="" />
+        <img ref={imgBRef} className="morphing-img" style={{ opacity: 0 }} alt="" />
+        <div className="progress-track">
+          <div className="progress-fill" style={{ width: `${progress.toFixed(2)}%` }} />
+        </div>
       </div>
-
-      <div className="progress-track">
-        <div className="progress-fill" style={{ width: `${progress.toFixed(2)}%` }} />
-      </div>
-
-      <div className="morphing-emotion-overlay">
-        <div className="emotion-section-label">YOUR EMOTIONS</div>
-        {EMOTION_ORDER.filter((k) => k in emotions).length > 0 ? (
-          EMOTION_ORDER.filter((k) => k in emotions).map((key) => {
-            const pct = Math.round(emotions[key] * 1000) / 10
-            return (
-              <div className="emotion-bar-row" key={key}>
-                <div className="emotion-bar-header">
-                  <span>{EMOTION_LATIN[key]}</span>
-                  <span>{pct}%</span>
+      <div className="phase-right">
+        <div className="morphing-top">
+          <div className="morphing-title">{artwork.title}</div>
+          <div className="morphing-frame-label">{frameLabel}</div>
+        </div>
+        <div className="morphing-emotion-section">
+          <div className="emotion-section-label">YOUR EMOTIONS</div>
+          {visibleEmotions.length > 0 ? (
+            visibleEmotions.map((key) => {
+              const pct = Math.round(emotions[key] * 1000) / 10
+              return (
+                <div className="emotion-bar-row" key={key}>
+                  <div className="emotion-bar-header">
+                    <span>{EMOTION_LATIN[key]}</span>
+                    <span>{pct}%</span>
+                  </div>
+                  <div className="emotion-bar-track">
+                    <div className="emotion-bar-fill" style={{ width: `${pct}%` }} />
+                  </div>
                 </div>
-                <div className="emotion-bar-track">
-                  <div className="emotion-bar-fill" style={{ width: `${pct}%` }} />
-                </div>
-              </div>
-            )
-          })
-        ) : (
-          <div style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontStyle: 'italic',
-            color: 'var(--gold-dark)',
-            textAlign: 'center',
-          }}>
-            Reading…
-          </div>
-        )}
+              )
+            })
+          ) : (
+            <div style={{
+              fontFamily: "'Cormorant Garamond', serif",
+              fontStyle: 'italic',
+              color: 'var(--gold-dark)',
+              textAlign: 'center',
+              fontSize: 'clamp(0.8rem,1.6vh,1.2rem)',
+            }}>
+              Reading…
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

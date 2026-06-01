@@ -21,6 +21,8 @@ export default function App() {
   return (
     <div className="installation">
       <div className="viewport">
+        <div className="gilt-border" />
+
         <CameraBackground onFrame={handleFrame} capturing />
 
         {state.phase === 'IDLE'     && <IdlePhase     state={state} />}

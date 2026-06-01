@@ -8,8 +8,6 @@ interface Props {
 export function IntroPhase({ state }: Props) {
   const { artwork } = state
 
-  // Preload all morphing frames during the 8s INTRO so they are cached
-  // before MorphingPhase starts — prevents flicker on early frames.
   useEffect(() => {
     if (!artwork) return
     const { slug, total_frames } = artwork
@@ -24,23 +22,24 @@ export function IntroPhase({ state }: Props) {
   const firstFrameUrl = `/frames/${artwork.slug}/0000.png`
 
   return (
-    <div className="intro-overlay">
-      <img className="intro-artwork" src={firstFrameUrl} alt={artwork.title} />
-      <div className="gilt-border" />
-
-      <div className="intro-top">
-        <div className="intro-label">THIS IS</div>
-        <div className="intro-title">{artwork.title}</div>
-      </div>
-
-      <div className="intro-bottom">
-        <div className="intro-body">
-          We will now give this picture to an{' '}
-          <span className="intro-em">AI</span>.
-          It will try to recreate the same picture —{' '}
-          <span className="intro-count">over 100 times</span>.
+    <div className="phase-layout">
+      <div className="phase-left">
+        <img className="intro-artwork" src={firstFrameUrl} alt={artwork.title} />
+        <div className="intro-top">
+          <div className="intro-label">THIS IS</div>
+          <div className="intro-title">{artwork.title}</div>
         </div>
-        <div className="intro-closing">Let us see what the AI does.</div>
+      </div>
+      <div className="phase-right">
+        <div className="intro-right">
+          <div className="intro-body">
+            We will now give this picture to an{' '}
+            <span className="intro-em">AI</span>.
+            It will try to recreate the same picture —{' '}
+            <span className="intro-count">over 50 times</span>.
+          </div>
+          <div className="intro-closing">Let us see what the AI does.</div>
+        </div>
       </div>
     </div>
   )

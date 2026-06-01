@@ -7,54 +7,57 @@ interface Props {
 export function IdlePhase({ state }: Props) {
   if (state.attract_mode) {
     return (
-      <div className="attract-overlay">
-        <div className="attract-title">VALLIS · SIMVLACRI</div>
-        <div className="attract-tagline">The Valley of Likeness</div>
-        <div className="divider">❧ · · · ❧</div>
-        <div className="attract-concept">
-          In 1970, roboticist Masahiro Mori described the <em>uncanny valley</em> —
-          the point where a human likeness becomes too real and tips into revulsion.
-          This installation measures your descent in real time.
+      <div className="phase-layout">
+        <div className="phase-left">
+          <div className="vignette" />
         </div>
-        <div style={{ margin: '0.6rem 0 0.2rem' }}>
-          {state.soul_count === 0 ? (
+        <div className="phase-right">
+          <div className="attract-title">VALLIS · SIMVLACRI</div>
+          <div className="attract-tagline">The Valley of Likeness</div>
+          <div className="divider">❧ · · · ❧</div>
+          <div className="attract-concept">
+            In 1970, roboticist Masahiro Mori described the <em>uncanny valley</em> —
+            the point where a human likeness becomes too real and tips into revulsion.
+            This installation measures your descent in real time.
+          </div>
+          <div>
+            {state.soul_count === 0 ? (
+              <div style={{
+                fontFamily: "'Cormorant Garamond', serif",
+                fontStyle: 'italic',
+                fontSize: 'clamp(1.03rem,2.18vh,1.69rem)',
+                color: 'var(--gold-dark)',
+                textAlign: 'center',
+              }}>
+                Be the first to enter
+              </div>
+            ) : (
+              <div className="attract-soul-counter">
+                ✦ &nbsp; {state.soul_count} &nbsp;
+                {state.soul_count === 1 ? 'SOUL' : 'SOULS'} HAVE ENTERED THE VALLEY &nbsp; ✦
+              </div>
+            )}
+          </div>
+          {state.attract_graph ? (
+            <img
+              className="attract-graph"
+              src={`data:image/png;base64,${state.attract_graph}`}
+              alt="aggregate data"
+            />
+          ) : (
             <div style={{
               fontFamily: "'Cormorant Garamond', serif",
               fontStyle: 'italic',
-              fontSize: 'clamp(1rem,1.8vw,1.6rem)',
               color: 'var(--gold-dark)',
               textAlign: 'center',
-              margin: '0.3rem 0',
+              fontSize: 'clamp(0.97rem,1.94vh,1.45rem)',
             }}>
-              Be the first to enter
-            </div>
-          ) : (
-            <div className="attract-soul-counter">
-              ✦ &nbsp; {state.soul_count} &nbsp;
-              {state.soul_count === 1 ? 'SOUL' : 'SOULS'} HAVE ENTERED THE VALLEY &nbsp; ✦
+              Awaiting the first soul…
             </div>
           )}
+          <div className="divider">❧ · · · ❧</div>
+          <div className="attract-cta">RAISE BOTH HANDS TO ENTER THE VALLEY</div>
         </div>
-        {state.attract_graph ? (
-          <img
-            className="attract-graph"
-            src={`data:image/png;base64,${state.attract_graph}`}
-            alt="aggregate data"
-          />
-        ) : (
-          <div style={{
-            fontFamily: "'Cormorant Garamond', serif",
-            fontStyle: 'italic',
-            color: 'var(--gold-dark)',
-            textAlign: 'center',
-            padding: '1.5rem 0',
-            fontSize: '1.1rem',
-          }}>
-            Awaiting the first soul…
-          </div>
-        )}
-        <div className="divider">❧ · · · ❧</div>
-        <div className="attract-cta">RAISE BOTH HANDS TO ENTER THE VALLEY</div>
       </div>
     )
   }
@@ -78,26 +81,27 @@ export function IdlePhase({ state }: Props) {
   }
 
   return (
-    <>
-      <div className="vignette" />
-      <div className="gilt-border" />
-      <div className="phase-overlay">
+    <div className="phase-layout">
+      <div className="phase-left">
+        <div className="vignette" />
         <div className="mirror-top">
           <div className="mirror-title">VALLIS · SIMVLACRI</div>
           <div className="mirror-divider">❧ · · ❧</div>
         </div>
-        <div className="mirror-bottom">
+      </div>
+      <div className="phase-right">
+        <div className="idle-right">
           <div className="mirror-status" style={{ color: statusColor }}>
             <span>{statusIcon}</span>
             {statusText}
             <span>{statusIcon}</span>
           </div>
           <div className="mirror-hint">{hint}</div>
-          <div className="mirror-divider">❧ · · ❧</div>
+          <div className="divider">❧ · · ❧</div>
           <div className="mirror-script">Vallis Simulacri</div>
           <div className="mirror-subtitle">THE VALLEY OF LIKENESS</div>
         </div>
       </div>
-    </>
+    </div>
   )
 }

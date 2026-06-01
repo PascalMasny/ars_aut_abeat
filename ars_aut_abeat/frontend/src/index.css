@@ -10,7 +10,9 @@
   --gold-bright: #E8C87A;
   --gold-dark:   #8B6F2E;
   --sage:        #6B7B5E;
-  --viewport-w:  min(100vw, calc(100vh * 112 / 199));
+  --left-w:      58%;
+  /* Derived viewport height — used for consistent sizing */
+  --vh: 1vh;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,28 +36,62 @@ html, body, #root {
   justify-content: center;
 }
 
-/* ─── Portrait viewport column ──────────────────────────────────────────── */
+/* ─── 16:9 landscape viewport ───────────────────────────────────────────── */
 .viewport {
   position: relative;
-  width: var(--viewport-w);
-  height: 100vh;
+  width: min(100vw, calc(100vh * 16 / 9));
+  height: min(100vh, calc(100vw * 9 / 16));
   overflow: hidden;
   flex-shrink: 0;
 }
 
-/* Black bars on sides for landscape screens */
-.installation::before,
-.installation::after {
-  content: '';
-  flex: 1;
-  height: 100vh;
-  background: var(--ink);
-}
-
-/* ─── Camera background ─────────────────────────────────────────────────── */
-.camera-bg {
+/* ─── Two-column phase layout ───────────────────────────────────────────── */
+.phase-layout {
   position: absolute;
   inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: row;
+}
+
+.phase-left {
+  flex: 0 0 var(--left-w);
+  position: relative;
+  height: 100%;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+/*
+  All sizing in the right panel is vh-based: in landscape the height
+  is always the tighter constraint. Flex children must opt into shrinking
+  via min-height: 0 so the panel never overflows.
+*/
+.phase-right {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 100%;
+  background: var(--ink);
+  border-left: 1px solid #3D1818;
+  display: flex;
+  flex-direction: column;
+  padding: clamp(0.6rem, 2vh, 1.8rem) clamp(0.8rem, 2.5vw, 2rem);
+  gap: clamp(0.4rem, 1vh, 1rem);
+  overflow: hidden;
+}
+
+/* Every direct child of the right panel can shrink */
+.phase-right > * {
+  flex-shrink: 1;
+  min-height: 0;
+}
+
+/* ─── Camera background (left panel only) ──────────────────────────────── */
+.camera-bg {
+  position: absolute;
+  top: 0; left: 0;
+  width: var(--left-w);
+  height: 100%;
   z-index: 0;
   overflow: hidden;
   background: #0a0806;
@@ -68,7 +104,7 @@ html, body, #root {
   transform: scaleX(-1);
 }
 
-/* Camera setup screen */
+/* Camera setup / error screen */
 .camera-setup {
   position: absolute;
   inset: 0;
@@ -86,7 +122,7 @@ html, body, #root {
 .camera-setup h1 {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.4rem, 4vw, 2.8rem);
+  font-size: clamp(1rem, 3vh, 2.4rem);
   letter-spacing: 0.2em;
   color: var(--gold);
 }
@@ -94,7 +130,7 @@ html, body, #root {
 .camera-setup p {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(1rem, 1.8vw, 1.5rem);
+  font-size: clamp(0.85rem, 2vh, 1.4rem);
   color: var(--parchment-d);
   max-width: 32rem;
   line-height: 1.6;
@@ -126,29 +162,19 @@ html, body, #root {
   z-index: 10;
 }
 
-/* ─── Phase overlays ────────────────────────────────────────────────────── */
-.phase-overlay {
+/* ─── IDLE — left panel overlay ─────────────────────────────────────────── */
+.mirror-top {
   position: absolute;
-  inset: 0;
-  z-index: 5;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: space-between;
-  padding: 2vh 1rem;
-  pointer-events: none;
+  top: 0; left: 0; right: 0;
+  text-align: center;
+  padding: clamp(1rem, 2vh, 2rem) 1rem clamp(1.5rem, 4vh, 3rem);
+  background: linear-gradient(rgba(28,20,16,0.75) 0%, transparent 100%);
 }
-
-.phase-overlay > * { position: relative; z-index: 1; }
-
-/* ─── IDLE mirror overlay ───────────────────────────────────────────────── */
-.mirror-top { text-align: center; padding-top: 2vh; }
-.mirror-bottom { text-align: center; padding-bottom: 2vh; }
 
 .mirror-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.5rem, 5vw, 4rem);
+  font-size: clamp(1.21rem, 4.24vh, 3.63rem);
   letter-spacing: 0.25em;
   color: var(--gold);
   text-shadow: 0 3px 20px rgba(0,0,0,0.8);
@@ -156,122 +182,101 @@ html, body, #root {
 
 .mirror-divider {
   color: var(--gold);
-  font-size: clamp(0.9rem, 1.5vw, 1.5rem);
+  font-size: clamp(0.7rem, 1.5vh, 1.2rem);
   letter-spacing: 0.3em;
   opacity: 0.5;
-  margin-top: 0.5rem;
+  margin-top: 0.3em;
+}
+
+/* ─── IDLE — right panel ────────────────────────────────────────────────── */
+.idle-right {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: clamp(0.5rem, 1.2vh, 1rem);
+  text-align: center;
+  overflow: hidden;
 }
 
 .mirror-status {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.9rem, 3vw, 2rem);
-  letter-spacing: 0.22em;
-  text-shadow: 0 3px 15px rgba(0,0,0,0.9);
+  font-size: clamp(0.75rem, 2vh, 1.6rem);
+  letter-spacing: 0.15em;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.8rem;
+  gap: 0.6em;
+  flex-shrink: 0;
 }
 
 .mirror-hint {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   color: var(--parchment-d);
-  font-size: clamp(0.95rem, 2vw, 1.5rem);
-  margin-top: 0.5rem;
-  text-shadow: 0 2px 12px rgba(0,0,0,0.9);
+  font-size: clamp(0.8rem, 1.8vh, 1.4rem);
+  flex-shrink: 0;
 }
 
 .mirror-script {
   font-family: 'Pinyon Script', cursive;
-  font-size: clamp(1.4rem, 4vw, 3rem);
+  font-size: clamp(1.2rem, 3.5vh, 3rem);
   color: var(--gold);
   opacity: 0.7;
-  text-shadow: 0 3px 15px rgba(0,0,0,0.8);
+  flex-shrink: 0;
 }
 
 .mirror-subtitle {
   font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(0.8rem, 1.2vw, 1.1rem);
-  letter-spacing: 0.15em;
+  font-size: clamp(0.65rem, 1.2vh, 1rem);
+  letter-spacing: 0.2em;
   color: var(--gold-dark);
-  margin-top: 0.2rem;
-  text-shadow: 0 2px 8px rgba(0,0,0,0.8);
+  flex-shrink: 0;
 }
 
-/* ─── Attract screen ────────────────────────────────────────────────────── */
-.attract-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 8;
-  background: var(--ink);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: clamp(1rem, 2.5vw, 2.5rem) clamp(1.5rem, 4vw, 4rem);
-  overflow: hidden;
-  animation: attractSlideIn 0.65s cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
-
-.attract-overlay::after {
-  content: '';
-  position: absolute;
-  top: 8px; left: 8px; right: 8px; bottom: 8px;
-  border: 3px solid var(--gold);
-  box-shadow:
-    0 0 0 1px var(--gold-dark),
-    inset 0 0 0 1px var(--gold-dark),
-    0 0 40px rgba(201,169,97,0.18),
-    inset 0 0 40px rgba(201,169,97,0.06);
-  pointer-events: none;
-}
-
-@keyframes attractSlideIn {
-  from { opacity: 0; transform: translateY(44px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-
+/* ─── Attract mode (right panel) ────────────────────────────────────────── */
 .attract-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.4rem, 5.5vw, 3rem);
+  font-size: clamp(1.21rem, 3.63vh, 2.92rem);
   letter-spacing: 0.25em;
   color: var(--gold);
   text-align: center;
+  flex-shrink: 0;
 }
 
 .attract-tagline {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.9rem, 3vw, 1.5rem);
+  font-size: clamp(0.91rem, 1.94vh, 1.57rem);
   letter-spacing: 0.2em;
   color: var(--gold-dark);
-  margin-top: 0.3rem;
   text-align: center;
+  flex-shrink: 0;
 }
 
 .attract-concept {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.9rem, 3.2vw, 1.5rem);
+  font-size: clamp(0.97rem, 1.82vh, 1.57rem);
   color: var(--parchment-d);
-  line-height: 1.7;
+  line-height: 1.6;
   text-align: center;
-  max-width: 70%;
-  margin: 0.4rem auto;
+  flex-shrink: 1;
 }
 
 .attract-soul-counter {
   font-family: 'Cinzel', serif;
   font-weight: 900;
-  font-size: clamp(2rem, 9vw, 5.5rem);
-  letter-spacing: 0.18em;
+  font-size: clamp(1.21rem, 3.63vh, 3.41rem);
+  letter-spacing: 0.12em;
   color: var(--gold);
   text-align: center;
   text-shadow: 0 0 40px rgba(201,169,97,0.45);
-  margin: 0.5rem 0;
+  flex-shrink: 0;
   animation: soulPulse 3s ease-in-out infinite;
 }
 
@@ -283,33 +288,27 @@ html, body, #root {
 .attract-cta {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.9rem, 3.5vw, 1.8rem);
-  letter-spacing: 0.2em;
+  font-size: clamp(0.85rem, 1.82vh, 1.57rem);
+  letter-spacing: 0.18em;
   color: var(--gold);
   text-align: center;
+  flex-shrink: 0;
 }
 
-/* Portrait-stacked graph (donut on top, bars below): let natural height show.
-   The figsize 5:6 gives ~1:1.2 aspect → at full column width ≈ 600 px the
-   rendered height is ~720 px → max-height caps it at a reasonable slice. */
+/* Graph shrinks to fill remaining space, never overflows */
 .attract-graph {
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
-  max-height: 50vh;
-  height: auto;
+  max-height: 52vh;
+  object-fit: contain;
   border-radius: 6px;
   border: 1px solid #3D2810;
   display: block;
-  margin: 0.5rem 0;
+  align-self: center;
 }
 
 /* ─── INTRO phase ───────────────────────────────────────────────────────── */
-.intro-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 9;
-  overflow: hidden;
-}
-
 .intro-artwork {
   position: absolute;
   inset: 0;
@@ -324,67 +323,60 @@ html, body, #root {
   top: 0; left: 0; right: 0;
   z-index: 5;
   background: linear-gradient(rgba(28,20,16,0.92) 0%, rgba(28,20,16,0.55) 70%, transparent 100%);
-  padding: 3vh 4vw 6vh;
+  padding: clamp(1rem, 2.5vh, 2rem) 4% clamp(2rem, 5vh, 4rem);
   text-align: center;
 }
 
 .intro-label {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.85rem, 1.3vw, 1.25rem);
+  font-size: clamp(0.7rem, 1.4vh, 1.1rem);
   letter-spacing: 0.3em;
   color: var(--gold-dark);
-  margin-bottom: 0.6rem;
+  margin-bottom: 0.4em;
 }
 
 .intro-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.3rem, 3.5vw, 2.8rem);
+  font-size: clamp(1rem, 2.8vh, 2.4rem);
   letter-spacing: 0.15em;
   color: var(--gold-bright);
   text-shadow: 0 3px 18px rgba(0,0,0,0.85);
 }
 
-.intro-bottom {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  z-index: 5;
-  background: linear-gradient(transparent, rgba(28,20,16,0.85) 30%, rgba(28,20,16,0.97));
-  padding: 6vh 8vw 4vh;
+.intro-right {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: clamp(0.6rem, 2vh, 1.5rem);
   text-align: center;
+  overflow: hidden;
 }
 
 .intro-body {
   font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(1.05rem, 1.8vw, 1.7rem);
-  line-height: 1.6;
+  font-size: clamp(0.9rem, 2vh, 1.6rem);
+  line-height: 1.65;
   color: var(--parchment-d);
-  max-width: 64rem;
-  margin: 0 auto;
+  flex-shrink: 1;
 }
 
-.intro-em { font-family: 'Cinzel', serif; font-weight: 700; letter-spacing: 0.18em; color: var(--gold); }
+.intro-em { font-family: 'Cinzel', serif; font-weight: 700; letter-spacing: 0.12em; color: var(--gold); }
 .intro-count { color: var(--gold-bright); font-weight: 600; }
 
 .intro-closing {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.95rem, 1.5vw, 1.4rem);
+  font-size: clamp(0.8rem, 1.6vh, 1.3rem);
   color: var(--gold-dark);
-  margin-top: 1.2rem;
-  letter-spacing: 0.15em;
+  letter-spacing: 0.12em;
+  flex-shrink: 0;
 }
 
 /* ─── MORPHING phase ────────────────────────────────────────────────────── */
-.morphing-container {
-  position: absolute;
-  inset: 0;
-  z-index: 9;
-  overflow: hidden;
-  background: #0a0806;
-}
-
 .morphing-img {
   position: absolute;
   inset: 0;
@@ -394,22 +386,15 @@ html, body, #root {
 }
 
 .morphing-top {
-  position: absolute;
-  top: 0; left: 0; right: 0;
-  z-index: 5;
-  background: linear-gradient(
-    rgba(28,20,16,0.97) 0%,
-    rgba(28,20,16,0.80) 55%,
-    transparent 100%
-  );
-  padding: 2.5vh 4vw 8vh;
-  text-align: center;
+  padding-bottom: clamp(0.4rem, 0.8vh, 0.8rem);
+  border-bottom: 1px solid #3D1818;
+  flex-shrink: 0;
 }
 
 .morphing-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.1rem, 3vw, 2.2rem);
+  font-size: clamp(0.9rem, 2.2vh, 2rem);
   letter-spacing: 0.15em;
   color: var(--gold);
 }
@@ -417,19 +402,18 @@ html, body, #root {
 .morphing-frame-label {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.85rem, 1.2vw, 1.2rem);
+  font-size: clamp(0.7rem, 1.3vh, 1.1rem);
   letter-spacing: 0.25em;
   color: var(--gold-dark);
-  margin-top: 0.3rem;
+  margin-top: 0.2em;
 }
 
 .progress-track {
   position: absolute;
-  left: 6vw; right: 6vw;
-  bottom: 1.5vh;
-  height: 2px;
+  left: 0; right: 0;
+  bottom: 0;
+  height: 3px;
   background: rgba(201,169,97,0.12);
-  border-radius: 2px;
   z-index: 5;
   overflow: hidden;
 }
@@ -437,42 +421,45 @@ html, body, #root {
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #8B6F2E, var(--gold));
-  border-radius: 2px;
   transition: width 0.1s linear;
 }
 
-.morphing-emotion-overlay {
-  position: absolute;
-  bottom: 0; left: 0; right: 0;
-  z-index: 10;
-  background: linear-gradient(transparent, rgba(28,20,16,0.88) 35%, rgba(28,20,16,0.97));
-  padding: 1vh 6vw 2vh;
-  pointer-events: none;
+/* Emotion section fills remaining vertical space, bars shrink if needed */
+.morphing-emotion-section {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(0.25rem, 0.8vh, 0.7rem);
+  overflow: hidden;
 }
 
 .emotion-section-label {
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.65rem, 0.85vw, 0.85rem);
+  font-size: clamp(0.6rem, 1.1vh, 0.9rem);
   letter-spacing: 0.2em;
   color: var(--gold-dark);
-  text-align: center;
-  margin-bottom: 0.6rem;
+  flex-shrink: 0;
 }
 
-.emotion-bar-row { margin: 0.3rem 0; }
+/* Each bar row shrinks uniformly when space is tight */
+.emotion-bar-row {
+  flex-shrink: 1;
+  min-height: 0;
+}
 
 .emotion-bar-header {
   display: flex;
   justify-content: space-between;
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.8rem, 1.1vw, 1.1rem);
+  font-size: clamp(0.65rem, 1.2vh, 1rem);
   letter-spacing: 0.07em;
   color: var(--gold);
-  margin-bottom: 3px;
+  margin-bottom: 2px;
 }
 
 .emotion-bar-track {
-  height: clamp(5px, 0.8vw, 9px);
+  height: clamp(4px, 0.7vh, 8px);
   background: rgba(201,169,97,0.15);
   border-radius: 5px;
   overflow: hidden;
@@ -486,102 +473,103 @@ html, body, #root {
 }
 
 /* ─── RECAP phase ───────────────────────────────────────────────────────── */
-.recap-overlay {
+.recap-left {
   position: absolute;
   inset: 0;
-  z-index: 9;
   background: var(--ink);
-  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  /* Extra top padding clears the gilt border (8px inset + 3px border) */
-  padding: 3vh 4vw 2.5vh;
-  gap: 1.6vh;
+  align-items: center;
+  justify-content: center;
+  padding: clamp(1rem, 3vh, 2.5rem) clamp(0.8rem, 2vw, 2rem);
+  gap: clamp(0.5rem, 1.5vh, 1.5rem);
+  overflow: hidden;
+}
+
+.recap-thumbnails {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 3%;
+  width: 100%;
+  min-height: 0;
+  flex-shrink: 1;
+}
+
+.recap-thumb-label {
+  font-family: 'Cinzel', serif;
+  font-size: clamp(0.55rem, 1vh, 0.9rem);
+  letter-spacing: 0.18em;
+  color: var(--gold-dark);
+  margin-bottom: 0.4em;
+  text-align: center;
+}
+
+.recap-thumb-frame {
+  border: 2px solid #3D2810;
+  padding: 3px;
+  background: #0a0806;
+  overflow: hidden;
+}
+
+.recap-thumb-frame img {
+  width: 100%;
+  height: auto;
+  max-height: 30vh;
+  object-fit: cover;
+  display: block;
 }
 
 .recap-header {
-  text-align: center;
+  border-bottom: 1px solid #3D1818;
+  padding-bottom: clamp(0.4rem, 0.8vh, 0.8rem);
   flex-shrink: 0;
 }
 
-/* In 112:199 portrait the column is ~56 vh wide — use vw-of-column via
-   clamp with a generous upper bound so text scales with the display size */
 .recap-section-label {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1rem, 4.5vw, 2rem);
-  letter-spacing: 0.28em;
+  font-size: clamp(0.75rem, 1.8vh, 1.6rem);
+  letter-spacing: 0.25em;
   color: var(--gold-dark);
 }
 
 .recap-artwork-name {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(1rem, 3.8vw, 1.7rem);
+  font-size: clamp(0.8rem, 1.6vh, 1.4rem);
   color: var(--gold);
-  margin-top: 0.3rem;
+  margin-top: 0.2em;
 }
 
-.recap-thumbnails {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2vw;
-  width: 100%;
-  flex-shrink: 0;
-}
-
-.recap-thumb-label {
-  font-family: 'Cinzel', serif;
-  font-size: clamp(0.7rem, 2.8vw, 1.1rem);
-  letter-spacing: 0.2em;
-  color: var(--gold-dark);
-  margin-bottom: 0.5rem;
-  text-align: center;
-}
-
-.recap-thumb-frame {
-  border: 2px solid #3D2810;
-  padding: 4px;
-  background: #0a0806;
-}
-
-.recap-thumb-frame img {
-  width: 100%;
-  height: 22vh;
-  object-fit: cover;
-  display: block;
-}
-
-/* Graph: let it fill column width; height is determined by the image's
-   own aspect ratio (figsize 6:3.2 ≈ 1.875:1) — no max-height clipping */
+/* Graph fills remaining space, shrinks on small screens */
 .recap-graph {
+  flex: 1 1 0;
+  min-height: 0;
   width: 100%;
-  height: auto;
+  max-height: 35vh;
+  object-fit: contain;
   border-radius: 6px;
   border: 1px solid #3D2810;
   display: block;
-  flex-shrink: 0;
+  align-self: center;
 }
 
 .recap-seal-row {
   display: flex;
   justify-content: center;
   flex-shrink: 0;
-  padding-bottom: 1vh;
 }
 
-/* Seal sized relative to the viewport width of the portrait column.
-   At 607 px wide: 22vw ≈ 133 px — comfortable but not overwhelming */
 .seal-medallion {
-  width: clamp(100px, 22vw, 180px);
-  height: clamp(100px, 22vw, 180px);
+  width: clamp(60px, 10vh, 140px);
+  height: clamp(60px, 10vh, 140px);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Cinzel', serif;
   font-weight: 900;
-  font-size: clamp(1.1rem, 5vw, 2.2rem);
+  font-size: clamp(0.75rem, 2vh, 1.8rem);
   letter-spacing: 0.08em;
   transform: rotate(-6deg);
   box-shadow: 0 6px 24px rgba(0,0,0,0.5);
@@ -600,7 +588,7 @@ html, body, #root {
   color: var(--gold);
   letter-spacing: 0.3em;
   opacity: 0.4;
-  font-size: 1rem;
-  margin: 0.3rem 0;
+  font-size: clamp(0.7rem, 1.2vh, 1rem);
   text-align: center;
+  flex-shrink: 0;
 }
