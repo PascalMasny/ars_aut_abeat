@@ -63,6 +63,8 @@ def _head_pose(landmarks, w: int, h: int) -> tuple:
         return 0.0, 0.0, 0.0
 
 
+_HANDS_DOWN_GRACE_S = 0.4  # ignore brief detection dropouts up to this long
+
 @dataclass
 class CameraState:
     face_present: bool = False
@@ -90,6 +92,7 @@ class GalleryProcessor:
         self._do_emotion = False
         self._do_pose = True
         self._running = True
+        self._hands_down_since: Optional[float] = None  # debounce: when hands first went down
 
         self._analysis_thread = threading.Thread(target=self._analysis_loop, daemon=True)
         self._analysis_thread.start()
@@ -225,7 +228,6 @@ class GalleryProcessor:
                 prev_hands = self._state.hands_raised
                 self._state.face_present = target is not None
                 self._state.face_centered = looking
-                self._state.hands_raised = hands_up
                 self._state.frame_w = w
                 self._state.frame_h = h
                 self._state.num_faces = len(faces)
@@ -235,10 +237,18 @@ class GalleryProcessor:
                     self._state.stable_since = now
                 elif not looking:
                     self._state.stable_since = None
-                if hands_up and not prev_hands:
-                    self._state.hands_raised_since = now
-                elif not hands_up:
-                    self._state.hands_raised_since = None
+                if hands_up:
+                    self._hands_down_since = None
+                    self._state.hands_raised = True
+                    if not prev_hands:
+                        self._state.hands_raised_since = now
+                else:
+                    if self._hands_down_since is None:
+                        self._hands_down_since = now
+                    grace_expired = (now - self._hands_down_since) >= _HANDS_DOWN_GRACE_S
+                    if grace_expired:
+                        self._state.hands_raised = False
+                        self._state.hands_raised_since = None
 
             elapsed_loop = time.time() - loop_start
             time.sleep(max(0.01, target_interval - elapsed_loop))

@@ -15,6 +15,7 @@ export interface Collective {
 }
 
 export interface ServerState {
+  show_mode: boolean
   phase: 'IDLE' | 'INTRO' | 'MORPHING' | 'RECAP'
   phase_elapsed: number
   phase_duration: number
@@ -33,6 +34,7 @@ export interface ServerState {
 }
 
 const DEFAULT_STATE: ServerState = {
+  show_mode: false,
   phase: 'IDLE',
   phase_elapsed: 0,
   phase_duration: 0,

@@ -22,7 +22,7 @@ export function CameraBackground({ onFrame, capturing }: Props) {
       <div className="camera-setup">
         <h1>VALLIS · SIMVLACRI</h1>
         <p>Camera access required. Please allow camera permission and reload.</p>
-        <p style={{ color: 'var(--gold-dark)', fontSize: '0.9rem' }}>{error}</p>
+        <p style={{ color: 'var(--gold-dark)', fontSize: '2rem' }}>{error}</p>
       </div>
     )
   }

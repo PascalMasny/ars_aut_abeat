@@ -59,7 +59,7 @@ export function RecapPhase({ state }: Props) {
             textAlign: 'center',
             padding: '1rem',
             fontFamily: "'Cormorant Garamond', serif",
-            fontSize: 'clamp(0.8rem,1.6vh,1.2rem)',
+            fontSize: 'clamp(1.2rem,3vh,2.8rem)',
           }}>
             No emotion data recorded.
           </div>

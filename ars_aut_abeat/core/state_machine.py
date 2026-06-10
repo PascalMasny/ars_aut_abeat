@@ -30,6 +30,8 @@ class InstallationState:
     recap_graph_b64: Optional[str] = None
     attract_graph_b64: Optional[str] = None
     attract_viewing_count: int = -1
+    show_mode: bool = False
+    show_trigger: bool = False
 
 
 def elapsed(state: InstallationState) -> float:
@@ -71,19 +73,25 @@ def advance_state(state: InstallationState, camera_state, catalog_manager, db_se
 def _handle_idle(state: InstallationState, camera_state, catalog_manager):
     from core.session import ViewerSession
 
-    if not camera_state.hands_raised or camera_state.hands_raised_since is None:
-        return
-
-    held_for = time.time() - camera_state.hands_raised_since
-    if held_for >= LOCK_STABILITY_DURATION:
-        artwork = catalog_manager.pick_next()
-        if artwork is None:
+    if state.show_mode:
+        if not state.show_trigger:
             return
-        session = ViewerSession(artwork_id=artwork["id"], artwork_slug=artwork["slug"])
-        state.viewer_session = session
-        state.current_artwork = artwork
-        state.recap_graph_b64 = None
-        enter_phase(state, "INTRO")
+        state.show_trigger = False
+    else:
+        if not camera_state.hands_raised or camera_state.hands_raised_since is None:
+            return
+        held_for = time.time() - camera_state.hands_raised_since
+        if held_for < LOCK_STABILITY_DURATION:
+            return
+
+    artwork = catalog_manager.pick_next()
+    if artwork is None:
+        return
+    session = ViewerSession(artwork_id=artwork["id"], artwork_slug=artwork["slug"])
+    state.viewer_session = session
+    state.current_artwork = artwork
+    state.recap_graph_b64 = None
+    enter_phase(state, "INTRO")
 
 
 def _finalize_viewing(state: InstallationState, db_session, camera_state):

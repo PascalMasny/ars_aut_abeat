@@ -75,8 +75,8 @@ html, body, #root {
   border-left: 1px solid #3D1818;
   display: flex;
   flex-direction: column;
-  padding: clamp(0.6rem, 2vh, 1.8rem) clamp(0.8rem, 2.5vw, 2rem);
-  gap: clamp(0.4rem, 1vh, 1rem);
+  padding: clamp(1rem, 3vh, 3rem) clamp(1.2rem, 3.5vw, 3.5rem);
+  gap: clamp(0.8rem, 1.8vh, 2rem);
   overflow: hidden;
 }
 
@@ -122,7 +122,7 @@ html, body, #root {
 .camera-setup h1 {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1rem, 3vh, 2.4rem);
+  font-size: clamp(1.5rem, 5vh, 5rem);
   letter-spacing: 0.2em;
   color: var(--gold);
 }
@@ -130,7 +130,7 @@ html, body, #root {
 .camera-setup p {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.85rem, 2vh, 1.4rem);
+  font-size: clamp(1rem, 3.5vh, 3rem);
   color: var(--parchment-d);
   max-width: 32rem;
   line-height: 1.6;
@@ -174,7 +174,7 @@ html, body, #root {
 .mirror-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.21rem, 4.24vh, 3.63rem);
+  font-size: clamp(2rem, 7vh, 7rem);
   letter-spacing: 0.25em;
   color: var(--gold);
   text-shadow: 0 3px 20px rgba(0,0,0,0.8);
@@ -182,7 +182,7 @@ html, body, #root {
 
 .mirror-divider {
   color: var(--gold);
-  font-size: clamp(0.7rem, 1.5vh, 1.2rem);
+  font-size: clamp(1rem, 2.5vh, 2.5rem);
   letter-spacing: 0.3em;
   opacity: 0.5;
   margin-top: 0.3em;
@@ -204,7 +204,7 @@ html, body, #root {
 .mirror-status {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.75rem, 2vh, 1.6rem);
+  font-size: clamp(1.2rem, 3.5vh, 3.5rem);
   letter-spacing: 0.15em;
   display: flex;
   align-items: center;
@@ -217,13 +217,13 @@ html, body, #root {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
   color: var(--parchment-d);
-  font-size: clamp(0.8rem, 1.8vh, 1.4rem);
+  font-size: clamp(1rem, 3vh, 3rem);
   flex-shrink: 0;
 }
 
 .mirror-script {
   font-family: 'Pinyon Script', cursive;
-  font-size: clamp(1.2rem, 3.5vh, 3rem);
+  font-size: clamp(2rem, 6vh, 6rem);
   color: var(--gold);
   opacity: 0.7;
   flex-shrink: 0;
@@ -231,7 +231,7 @@ html, body, #root {
 
 .mirror-subtitle {
   font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(0.65rem, 1.2vh, 1rem);
+  font-size: clamp(1rem, 2vh, 2rem);
   letter-spacing: 0.2em;
   color: var(--gold-dark);
   flex-shrink: 0;
@@ -241,7 +241,7 @@ html, body, #root {
 .attract-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1.21rem, 3.63vh, 2.92rem);
+  font-size: clamp(2rem, 6vh, 6rem);
   letter-spacing: 0.25em;
   color: var(--gold);
   text-align: center;
@@ -251,7 +251,7 @@ html, body, #root {
 .attract-tagline {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.91rem, 1.94vh, 1.57rem);
+  font-size: clamp(1.5rem, 3.5vh, 3.5rem);
   letter-spacing: 0.2em;
   color: var(--gold-dark);
   text-align: center;
@@ -261,7 +261,7 @@ html, body, #root {
 .attract-concept {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.97rem, 1.82vh, 1.57rem);
+  font-size: clamp(1.4rem, 3vh, 3rem);
   color: var(--parchment-d);
   line-height: 1.6;
   text-align: center;
@@ -271,7 +271,7 @@ html, body, #root {
 .attract-soul-counter {
   font-family: 'Cinzel', serif;
   font-weight: 900;
-  font-size: clamp(1.21rem, 3.63vh, 3.41rem);
+  font-size: clamp(2rem, 6vh, 6.5rem);
   letter-spacing: 0.12em;
   color: var(--gold);
   text-align: center;
@@ -288,7 +288,7 @@ html, body, #root {
 .attract-cta {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.85rem, 1.82vh, 1.57rem);
+  font-size: clamp(1.5rem, 3.5vh, 3.5rem);
   letter-spacing: 0.18em;
   color: var(--gold);
   text-align: center;
@@ -330,7 +330,7 @@ html, body, #root {
 .intro-label {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.7rem, 1.4vh, 1.1rem);
+  font-size: clamp(1rem, 2.5vh, 2.5rem);
   letter-spacing: 0.3em;
   color: var(--gold-dark);
   margin-bottom: 0.4em;
@@ -339,7 +339,7 @@ html, body, #root {
 .intro-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(1rem, 2.8vh, 2.4rem);
+  font-size: clamp(1.8rem, 5vh, 5rem);
   letter-spacing: 0.15em;
   color: var(--gold-bright);
   text-shadow: 0 3px 18px rgba(0,0,0,0.85);
@@ -358,7 +358,7 @@ html, body, #root {
 
 .intro-body {
   font-family: 'Cormorant Garamond', serif;
-  font-size: clamp(0.9rem, 2vh, 1.6rem);
+  font-size: clamp(1.4rem, 3.5vh, 3.5rem);
   line-height: 1.65;
   color: var(--parchment-d);
   flex-shrink: 1;
@@ -370,7 +370,7 @@ html, body, #root {
 .intro-closing {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.8rem, 1.6vh, 1.3rem);
+  font-size: clamp(1.2rem, 3vh, 3rem);
   color: var(--gold-dark);
   letter-spacing: 0.12em;
   flex-shrink: 0;
@@ -394,7 +394,7 @@ html, body, #root {
 .morphing-title {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.9rem, 2.2vh, 2rem);
+  font-size: clamp(1.5rem, 4vh, 4.5rem);
   letter-spacing: 0.15em;
   color: var(--gold);
 }
@@ -402,7 +402,7 @@ html, body, #root {
 .morphing-frame-label {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.7rem, 1.3vh, 1.1rem);
+  font-size: clamp(1rem, 2.5vh, 2.5rem);
   letter-spacing: 0.25em;
   color: var(--gold-dark);
   margin-top: 0.2em;
@@ -436,7 +436,7 @@ html, body, #root {
 
 .emotion-section-label {
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.6rem, 1.1vh, 0.9rem);
+  font-size: clamp(1rem, 2vh, 2rem);
   letter-spacing: 0.2em;
   color: var(--gold-dark);
   flex-shrink: 0;
@@ -452,14 +452,14 @@ html, body, #root {
   display: flex;
   justify-content: space-between;
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.65rem, 1.2vh, 1rem);
+  font-size: clamp(1rem, 2.2vh, 2.2rem);
   letter-spacing: 0.07em;
   color: var(--gold);
   margin-bottom: 2px;
 }
 
 .emotion-bar-track {
-  height: clamp(4px, 0.7vh, 8px);
+  height: clamp(8px, 1.4vh, 20px);
   background: rgba(201,169,97,0.15);
   border-radius: 5px;
   overflow: hidden;
@@ -497,7 +497,7 @@ html, body, #root {
 
 .recap-thumb-label {
   font-family: 'Cinzel', serif;
-  font-size: clamp(0.55rem, 1vh, 0.9rem);
+  font-size: clamp(0.9rem, 2vh, 2rem);
   letter-spacing: 0.18em;
   color: var(--gold-dark);
   margin-bottom: 0.4em;
@@ -528,7 +528,7 @@ html, body, #root {
 .recap-section-label {
   font-family: 'Cinzel', serif;
   font-weight: 700;
-  font-size: clamp(0.75rem, 1.8vh, 1.6rem);
+  font-size: clamp(1.2rem, 3.5vh, 3.5rem);
   letter-spacing: 0.25em;
   color: var(--gold-dark);
 }
@@ -536,7 +536,7 @@ html, body, #root {
 .recap-artwork-name {
   font-family: 'Cormorant Garamond', serif;
   font-style: italic;
-  font-size: clamp(0.8rem, 1.6vh, 1.4rem);
+  font-size: clamp(1.2rem, 3vh, 3rem);
   color: var(--gold);
   margin-top: 0.2em;
 }
@@ -561,15 +561,15 @@ html, body, #root {
 }
 
 .seal-medallion {
-  width: clamp(60px, 10vh, 140px);
-  height: clamp(60px, 10vh, 140px);
+  width: clamp(100px, 18vh, 280px);
+  height: clamp(100px, 18vh, 280px);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   font-family: 'Cinzel', serif;
   font-weight: 900;
-  font-size: clamp(0.75rem, 2vh, 1.8rem);
+  font-size: clamp(1.2rem, 4vh, 4rem);
   letter-spacing: 0.08em;
   transform: rotate(-6deg);
   box-shadow: 0 6px 24px rgba(0,0,0,0.5);
@@ -588,7 +588,7 @@ html, body, #root {
   color: var(--gold);
   letter-spacing: 0.3em;
   opacity: 0.4;
-  font-size: clamp(0.7rem, 1.2vh, 1rem);
+  font-size: clamp(1rem, 2vh, 2.2rem);
   text-align: center;
   flex-shrink: 0;
 }

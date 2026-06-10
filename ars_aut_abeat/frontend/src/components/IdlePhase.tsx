@@ -25,7 +25,7 @@ export function IdlePhase({ state }: Props) {
               <div style={{
                 fontFamily: "'Cormorant Garamond', serif",
                 fontStyle: 'italic',
-                fontSize: 'clamp(1.03rem,2.18vh,1.69rem)',
+                fontSize: 'clamp(1.8rem,4vh,4rem)',
                 color: 'var(--gold-dark)',
                 textAlign: 'center',
               }}>
@@ -38,25 +38,10 @@ export function IdlePhase({ state }: Props) {
               </div>
             )}
           </div>
-          {state.attract_graph ? (
-            <img
-              className="attract-graph"
-              src={`data:image/png;base64,${state.attract_graph}`}
-              alt="aggregate data"
-            />
-          ) : (
-            <div style={{
-              fontFamily: "'Cormorant Garamond', serif",
-              fontStyle: 'italic',
-              color: 'var(--gold-dark)',
-              textAlign: 'center',
-              fontSize: 'clamp(0.97rem,1.94vh,1.45rem)',
-            }}>
-              Awaiting the first soul…
-            </div>
-          )}
           <div className="divider">❧ · · · ❧</div>
-          <div className="attract-cta">RAISE BOTH HANDS TO ENTER THE VALLEY</div>
+          <div className="attract-cta">
+            {state.show_mode ? 'PRESS SPACE TO BEGIN' : 'RAISE BOTH HANDS TO ENTER THE VALLEY'}
+          </div>
         </div>
       </div>
     )
@@ -68,7 +53,12 @@ export function IdlePhase({ state }: Props) {
   let statusColor = 'var(--gold-dark)'
   let hint = 'Stand before the glass and raise both hands when ready.'
 
-  if (hands_raised) {
+  if (state.show_mode) {
+    statusIcon = '◉'
+    statusText = 'SHOW MODE'
+    statusColor = 'var(--gold)'
+    hint = 'Press Space to begin the next run.'
+  } else if (hands_raised) {
     statusIcon = '✦'
     statusText = 'CONSENT ACKNOWLEDGED — HOLD'
     statusColor = 'var(--gold-bright)'

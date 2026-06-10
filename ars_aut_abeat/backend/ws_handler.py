@@ -162,6 +162,7 @@ class GallerySession:
             }
 
         return {
+            "show_mode":       state.show_mode,
             "phase":           phase,
             "phase_elapsed":   round(t, 2),
             "phase_duration":  {"INTRO": 8.0, "MORPHING": MORPHING_DURATION, "RECAP": 15.0}.get(phase, 0.0),

@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from data.db import init_db
 from config import BASE_DIR
@@ -39,6 +40,29 @@ def startup():
     from backend.ws_handler import get_processor, get_catalog
     get_processor()
     get_catalog()
+
+
+class ModeRequest(BaseModel):
+    mode: str  # "self" or "show"
+
+
+@app.post("/api/mode")
+def set_mode(req: ModeRequest):
+    from backend.ws_handler import get_installation_state
+    state = get_installation_state()
+    state.show_mode = (req.mode == "show")
+    return {"mode": req.mode}
+
+
+@app.post("/api/trigger")
+def trigger_show():
+    from backend.ws_handler import get_installation_state
+    state = get_installation_state()
+    triggered = False
+    if state.show_mode and state.phase == "IDLE":
+        state.show_trigger = True
+        triggered = True
+    return {"triggered": triggered}
 
 
 @app.websocket("/ws")
