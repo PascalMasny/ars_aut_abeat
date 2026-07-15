@@ -16,9 +16,11 @@ download_human_figures.py
          ▼
 iterate_degrade.py  (one run per image)
          │  LLaVA → description prompt
-         │  Stable Diffusion img2img × 100 iterations
+         │  Stable Diffusion img2img × 10 pictures:
+         │  1–5 direct from original (0.10 → 0.30, fixed seed)
+         │  6–10 chained feedback / model collapse (0.22 → 0.42)
          ▼
-  catalog_iterations/<stem>/0000.png … 0100.png
+  catalog_iterations_10/<stem>/0000.png … 0010.png
 ```
 
 ---
@@ -52,43 +54,47 @@ Typical run: ~200 images, runtime depends on network speed.
 
 ## Step 2 — Generating Degradation Sequences
 
-`iterate_degrade.py` takes each source image and runs it through 100 rounds of Stable Diffusion img2img. Each round feeds the *output* of the previous round back as the *input*, so distortion compounds like a visual game of telephone.
+`iterate_degrade.py` generates 10 pictures per source image in **two phases**:
+
+- **Phase 1 — pictures 1–5, direct.** Each is a single img2img pass straight from the original with a gentle strength ramp (0.10 → 0.30) and a per-artwork fixed seed. One VAE roundtrip per picture, so these stay genuinely close to the source: subtle, coherent drift.
+- **Phase 2 — pictures 6–10, chained.** Each output becomes the next input (true *model collapse*) with strength 0.22 → 0.42 and a per-step seed. VAE-roundtrip damage and hallucinations compound: the paint surface disintegrates and the figure falls apart with accelerating wrongness while the composition survives.
+
+The 10 pictures map directly onto the gallery experience: the installation shows one picture every 3 seconds and measures which one breaks the visitor.
 
 ### Algorithm
 
 ```
 load source image
 query LLaVA once → description_prompt
-frame_0 = source image
+seed = crc32(filename)                                  # stable per artwork
 
-for i in 1..100:
-    frame_i = SD_img2img(
-        init_image = frame_{i-1},
-        prompt     = description_prompt,
-        strength   = 0.45,
-        guidance   = 6.0,
-        steps      = 25,
-    )
-    save frame_i as catalog_iterations/<stem>/<i:04d>.png
+for i in 1..5:                                          # phase 1: direct
+    strength_i = 0.10 + (0.30 − 0.10) · (i − 1) / 4
+    picture_i  = SD_img2img(original 512×512, prompt, strength_i, seed)
 
-save source as 0000.png
+current = picture_5
+for i in 6..10:                                         # phase 2: chained
+    strength_i = 0.22 + (0.42 − 0.22) · (i − 6) / 4
+    picture_i  = SD_img2img(current, prompt, strength_i, seed + i)
+    current    = picture_i
+
+save original as 0000.png; pictures as <i:04d>.png      # guidance 6.0, steps 25
 ```
 
-The `strength` parameter (0.45) controls how aggressively each iteration changes the image. At 0.45 each frame drifts slightly; over 100 iterations the cumulative drift produces pronounced uncanny distortion while preserving enough of the original composition to remain recognisable.
+Full strength schedule: `0.10 · 0.15 · 0.20 · 0.25 · 0.30 │ 0.22 · 0.27 · 0.32 · 0.37 · 0.42` (the `│` marks the phase switch). The first pictures stay almost faithful — the visitor should not be jolted immediately — the collapse sets in at picture 6 and deepens to full disintegration by 10. This mirrors the uncanny-valley curve itself: a slow approach, then a plunge.
 
-### Why this produces uncanny imagery — model collapse
+### Why two phases (findings from visual testing)
 
-This feedback loop is a controlled instance of **model collapse**: the well-documented failure mode where iterative use of a model's own outputs as inputs causes progressive drift away from the original data distribution.
+1. **A pure chain fails early.** Every img2img pass sends the image through SD's VAE (encode → latent → decode) plus a resize to 512×512. That roundtrip repaints fine texture *regardless of strength*; chained from picture 1, the damage compounds and the paint surface is mush by picture 5 — too much, too early.
+2. **A pure direct ramp fails late.** Single passes at high strength re-cohere: instead of collapsing, picture 10 becomes a clean *different* painting. No disintegration character.
+3. **Chain strength must stay low.** Chained passes above ~0.5 also re-cohere into a new scene. Keeping the chain at 0.22–0.42 lets roundtrip damage accumulate into painterly disintegration while the composition survives.
+4. **Chain seeds must vary.** Re-injecting the *same* noise pattern into a feedback loop resonates and explodes into high-frequency artefacts within one step; per-step seeds (`seed + i`) produce organic collapse instead.
 
-In practice two processes run in parallel:
+The hybrid keeps the best of both: pictures 1–5 genuinely sit next to the original (one roundtrip each), pictures 6–10 are true model collapse.
 
-1. **Regression to the model's prototype.** Stable Diffusion's training distribution has a strong prior on what a human face looks like — symmetrical, smooth, proportions near the statistical mean. Each img2img pass nudges the image slightly toward that prior. Individual features erode. Asymmetries that make a face human are symmetrised. Skin texture homogenises.
+### Why this produces uncanny imagery
 
-2. **Hallucination accumulation.** Every generation introduces small artefacts — sub-pixel errors in lighting, ambiguous edge reconstructions, detail that was inferred rather than copied. These artefacts are real pixels in the next iteration's input; the model treats them as ground truth and elaborates on them. By iteration 30–50, compound artefacts are clearly visible; by iteration 100, whole regions of the image may be structurally unrecognisable from the source.
-
-The combination — regression toward an average *and* accumulation of artefacts — is what produces specifically uncanny distortion rather than generic noise. The image remains recognisably human (regression keeps the structure) while becoming deeply wrong (hallucinations corrupt the detail). This is the operating principle of the piece.
-
-Note: increasing `STRENGTH` above ~0.6 collapses the image to noise within ~30 iterations because hallucination accumulation outpaces structural regression. The default of 0.45 is tuned to keep both processes roughly in balance across all 100 iterations.
+Stable Diffusion's training distribution has a strong prior on what a human looks like — symmetrical, smooth, proportions near the statistical mean. As its freedom grows, the model substitutes its prior for the painter's choices: features erode, asymmetries symmetrise, and details it cannot read (eyes, hands, fabric) are hallucinated back imperfectly. In the chained phase these errors become the next pass's ground truth and compound. The figure remains recognisably human while becoming deeply wrong — simultaneously over-familiar and foreign. That tension is the operating principle of the piece.
 
 ### Prompt generation (LLaVA)
 
@@ -96,7 +102,7 @@ Before the iteration loop, the source image is sent to a locally-running LLaVA i
 
 > "Describe this artwork in under 30 words, focusing on the human figure, style, and medium. Write only the description, no preamble."
 
-The response is used as the Stable Diffusion prompt for all 100 iterations, ensuring that each frame's drift is anchored to the original subject rather than drifting arbitrarily.
+The response is used as the Stable Diffusion prompt for all 10 pictures, ensuring that each picture's drift is anchored to the original subject rather than drifting arbitrarily.
 
 **Fallback**: if Ollama is not running, a generic prompt is used:
 ```
@@ -107,15 +113,15 @@ The quality difference between LLaVA-guided and generic prompts is meaningful fo
 
 ### Hardware requirements
 
-| Device | Estimated runtime per image |
-|--------|-----------------------------|
-| Apple M-series (MPS) | ~8–12 min |
-| NVIDIA GPU (CUDA) | ~3–6 min |
-| CPU only | ~60–120 min |
+| Device | Estimated runtime per image (10 iterations) |
+|--------|---------------------------------------------|
+| Apple M-series (MPS) | ~1 min |
+| NVIDIA GPU (CUDA) | ~30 s |
+| CPU only | ~10 min |
 
 Device is detected automatically: MPS → CUDA → CPU.
 
-The script is resumable: frames that already exist on disk are skipped. A partial run (e.g. frames 0000–0047) will continue from frame 0048 on the next invocation.
+The script is resumable: existing pictures are skipped; chained pictures reload their predecessor from disk. An artwork is considered complete when `0010.png` exists — delete its directory to force regeneration. Fixed seeds make reruns reproduce identical pictures.
 
 ### Model
 
@@ -127,18 +133,20 @@ The script is resumable: frames that already exist on disk are skipped. A partia
 
 ```
 uncanny_maker/
-└── catalog_iterations/
+└── catalog_iterations_10/
     └── The_Dance_Class_438817/
-        ├── 0000.png   ← source image (copy)
-        ├── 0001.png   ← after 1 iteration
-        ├── 0002.png
+        ├── 0000.png   ← source image (copy) — shown during BASELINE
+        ├── 0001.png   ← direct, strength 0.10 (texture retouch)
         │   …
-        └── 0100.png   ← after 100 iterations
+        ├── 0005.png   ← direct, strength 0.30 (drifting, still the painting)
+        ├── 0006.png   ← chained, collapse sets in
+        │   …
+        └── 0010.png   ← chained, disintegrated
 ```
 
 All frames are 512×512 px (Stable Diffusion native resolution). The gallery app upscales them to fit the display via CSS `object-fit: contain`.
 
-The `catalog_iterations/` directory is excluded from version control (see `.gitignore`) because the full sequence set can exceed 10 GB.
+The directory is excluded from version control (see `.gitignore`). The older 50/100-frame sets in `catalog_iterations/` are kept as an archive but are no longer read by the app.
 
 ---
 
@@ -159,12 +167,14 @@ In `iterate_degrade.py` itself:
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ITERATIONS` | 100 | Number of feedback loops per image |
-| `STRENGTH` | 0.45 | Overrides `DEFAULT_STRENGTH` |
+| `ITERATIONS` | 10 | Pictures per artwork |
+| `DIRECT_COUNT` | 5 | Pictures generated directly from the original |
+| `DIRECT_START` / `DIRECT_END` | 0.10 / 0.30 | Strength ramp of the direct phase |
+| `CHAIN_START` / `CHAIN_END` | 0.22 / 0.42 | Strength ramp of the chained phase (higher values re-cohere into a different painting instead of collapsing) |
 | `GUIDANCE` | 6.0 | Overrides `DEFAULT_GUIDANCE` |
-| `STEPS` | 25 | Inference steps per iteration (speed vs. quality) |
+| `STEPS` | 25 | Inference steps per picture (speed vs. quality) |
 
-Reducing `STEPS` to 15 roughly halves runtime with only minor quality loss. Increasing `STRENGTH` above 0.6 tends to collapse the image into noise within ~30 iterations.
+Reducing `STEPS` to 15 roughly halves runtime with only minor quality loss. If the early drift is too strong, lower `DIRECT_END`; if the collapse is too tame, raise `CHAIN_END` (stay below ~0.5). Test a single artwork first with `python test_single.py catalog/<image>.jpg`.
 
 ---
 
@@ -172,5 +182,5 @@ Reducing `STEPS` to 15 roughly halves runtime with only minor quality loss. Incr
 
 `uncanny_maker/_archive/` contains earlier approaches that were superseded:
 
-- **4-stage approach** (`catalog_uncanny/`): Only four fixed degradation levels (0 %, 20 %, 60 %, 80 % strength). Produced discontinuous jumps rather than smooth morphing. Still supported by `CatalogManager` as a fallback format.
-- **Single-pass degradation**: No iterative feedback, just one img2img pass at increasing strength. Produced monotonic noise rather than uncanny accumulation.
+- **4-stage approach** (`catalog_uncanny/`): Only four fixed degradation levels (0 %, 20 %, 60 %, 80 % strength). Produced discontinuous jumps rather than a gradual descent. Still supported by `CatalogManager` as a fallback format.
+- **Feedback-chain degradation** (`catalog_iterations/`, 50–100 frames): each output fed back as the next input — model collapse as a compositional tool. Visually compelling in the late frames but unusable early: compounding VAE-roundtrip damage repainted the texture from picture 1. Replaced by direct per-picture generation with a fixed seed.

@@ -1,0 +1,198 @@
+/* Vallis Simulacri — PDF-Theme.
+   Palette und Typografie gespiegelt aus ars_aut_abeat/frontend/src/index.css.
+   Wird von build.sh zusammen mit fonts.css in die Markdown-Quelle injiziert. */
+
+:root {
+  --ink:          #1C1410;
+  --ink-raised:   #251B15;
+  --parchment:    #F4E8D0;
+  --parchment-d:  #C4B79C;
+  --burgundy:     #6B2C2C;
+  --gold:         #C9A961;
+  --gold-bright:  #E8C87A;
+  --gold-dark:    #8B6F2E;
+}
+
+/* Druckfarben erzwingen — ohne das bleibt der dunkle Grund weiß. */
+*, *::before, *::after {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+}
+
+/* Full-Bleed: Chromium füllt die @page-Randzone nie mit Farbe, egal was auf
+   html steht. Deshalb baut build.sh mit `--margins 0` — die Seitenränder
+   entstehen hier als body-Padding, und der Tintengrund läuft bis an die
+   Blattkante. Konsequenz: keine @page-Randboxen, also keine Seitenzahlen. */
+html {
+  background: var(--ink) !important;
+}
+
+body {
+  background: var(--ink) !important;
+  color: var(--parchment) !important;
+  font-family: 'Cormorant Garamond', Georgia, serif !important;
+  font-size: 11.5pt !important;
+  line-height: 1.5 !important;
+  margin: 0 !important;
+  padding: 11mm 14mm !important;
+  max-width: none !important;
+}
+
+/* ─── Inschriften ───────────────────────────────────────────────────────── */
+
+h1, h2, h3, h4 {
+  font-family: 'Cinzel', 'Times New Roman', serif !important;
+  color: var(--gold) !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  line-height: 1.25 !important;
+}
+
+h1 {
+  font-size: 21pt !important;
+  font-weight: 900 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.07em !important;
+  border-bottom: 1px solid var(--gold-dark) !important;
+  padding-bottom: 0.3em !important;
+  margin-bottom: 0.7em !important;
+}
+
+h2 { font-size: 14pt !important; margin-top: 1.1em !important; }
+h3 { font-size: 12pt !important; color: var(--gold-bright) !important; }
+
+/* ─── Fließtext ─────────────────────────────────────────────────────────── */
+
+p { color: var(--parchment) !important; }
+strong { color: var(--gold-bright) !important; font-weight: 600 !important; }
+em { color: var(--parchment) !important; }
+a { color: var(--gold) !important; }
+
+/* Die Leitfrage — als Devise gesetzt, nicht als Zitat. */
+blockquote {
+  border: none !important;
+  border-left: 2px solid var(--gold) !important;
+  background: var(--ink-raised) !important;
+  margin: 1.1em 0 !important;
+  padding: 0.6em 1em !important;
+  color: var(--gold-bright) !important;
+  font-size: 12.5pt !important;
+  font-style: italic !important;
+}
+blockquote p { color: var(--gold-bright) !important; }
+
+hr {
+  border: none !important;
+  border-top: 1px solid var(--gold-dark) !important;
+  margin: 1.4em 0 !important;
+}
+
+/* ─── Tabellen: Wachssiegel-Register ────────────────────────────────────── */
+
+table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+  margin: 1em 0 !important;
+  background: var(--ink-raised) !important;
+}
+
+th {
+  font-family: 'Cinzel', serif !important;
+  font-size: 8.5pt !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.09em !important;
+  color: var(--gold) !important;
+  background: var(--ink) !important;
+  border-bottom: 1px solid var(--gold) !important;
+  text-align: left !important;
+  padding: 0.45em 0.7em !important;
+}
+
+td {
+  color: var(--parchment) !important;
+  border-bottom: 1px solid rgba(201, 169, 97, 0.22) !important;
+  padding: 0.45em 0.7em !important;
+}
+
+tr:last-child td { border-bottom: none !important; }
+
+/* Die Siegelnamen in der ersten Spalte als Inschrift. */
+td:first-child strong {
+  font-family: 'Cinzel', serif !important;
+  letter-spacing: 0.06em !important;
+  color: var(--gold-bright) !important;
+}
+
+/* ─── Listen ────────────────────────────────────────────────────────────── */
+
+li { color: var(--parchment) !important; }
+li::marker { color: var(--gold-dark) !important; }
+
+/* ─── Diagramme ─────────────────────────────────────────────────────────── */
+
+/* Mermaid rendert auf transparentem Grund; ohne das setzt es sich weiß ab. */
+svg[id^="mermaid"], .mermaid svg, figure svg {
+  background: transparent !important;
+}
+
+figure, .mermaid { background: transparent !important; }
+
+figcaption {
+  font-family: 'Cinzel', serif !important;
+  font-size: 8pt !important;
+  letter-spacing: 0.08em !important;
+  text-transform: uppercase !important;
+  color: var(--gold-dark) !important;
+  text-align: center !important;
+}
+
+/* ─── Bilder ────────────────────────────────────────────────────────────── */
+
+img {
+  border: 1px solid var(--gold-dark) !important;
+}
+
+/* ─── Signatur ──────────────────────────────────────────────────────────── */
+
+/* Steht als letzter Absatz in der Markdown-Quelle. Eine echte Fußzeile ist
+   nicht möglich, solange der Rand 0 ist (siehe body oben). */
+.signatur {
+  font-family: 'Cinzel', serif !important;
+  font-size: 7.5pt !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--gold-dark) !important;
+  text-align: center !important;
+  margin-top: 0.9em !important;
+  border-top: 1px solid rgba(201, 169, 97, 0.25) !important;
+  padding-top: 0.5em !important;
+  break-inside: avoid !important;
+}
+
+/* ─── Deckblatt (--cover) ───────────────────────────────────────────────── */
+
+.cover, .cover-page {
+  background: var(--ink) !important;
+}
+
+.cover h1, .cover-page h1, .cover .title, .cover h1.cover-title {
+  border-bottom: none !important;
+  color: var(--gold) !important;
+}
+
+.cover hr, .cover-page hr, .cover hr.rule {
+  border-top: 1px solid var(--gold) !important;
+}
+
+/* make-pdf setzt diese auf #333/#666 — auf Tinte praktisch unlesbar. */
+.cover .cover-meta, .cover .cover-subtitle {
+  color: var(--parchment) !important;
+}
+
+.cover .cover-meta strong {
+  color: var(--gold-bright) !important;
+}
+
+.cover .eyebrow {
+  color: var(--gold-dark) !important;
+}

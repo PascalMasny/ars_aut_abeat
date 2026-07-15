@@ -20,10 +20,10 @@ from backend.ws_handler import GallerySession
 
 app = FastAPI()
 
-# Serve artwork frames (catalog_iterations lives one level up in uncanny_maker)
-_FRAMES_DIR = BASE_DIR.parent / "uncanny_maker" / "catalog_iterations"
-if _FRAMES_DIR.exists():
-    app.mount("/frames", StaticFiles(directory=str(_FRAMES_DIR)), name="frames")
+# Serve artwork frames (iteration output lives one level up in uncanny_maker)
+from config import UNCANNY_ITER_DIR
+if UNCANNY_ITER_DIR.exists():
+    app.mount("/frames", StaticFiles(directory=str(UNCANNY_ITER_DIR)), name="frames")
 
 # Serve original catalog images for 0000.png fallback
 _CATALOG_DIR = BASE_DIR.parent / "uncanny_maker" / "catalog"

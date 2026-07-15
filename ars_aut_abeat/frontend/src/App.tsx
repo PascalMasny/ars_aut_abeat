@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { useWebSocket } from './hooks/useWebSocket'
 import { CameraBackground } from './components/CameraBackground'
 import { IdlePhase } from './components/IdlePhase'
-import { IntroPhase } from './components/IntroPhase'
-import { MorphingPhase } from './components/MorphingPhase'
-import { RecapPhase } from './components/RecapPhase'
+import { BaselinePhase } from './components/BaselinePhase'
+import { GalleryPhase } from './components/GalleryPhase'
+import { RevealPhase } from './components/RevealPhase'
 import { SlidesPhase } from './components/SlidesPhase'
 
 const WS_URL =
@@ -50,9 +50,9 @@ export default function App() {
         <CameraBackground onFrame={handleFrame} capturing />
 
         {state.phase === 'IDLE'     && <IdlePhase     state={state} />}
-        {state.phase === 'INTRO'    && <IntroPhase    state={state} />}
-        {state.phase === 'MORPHING' && <MorphingPhase state={state} />}
-        {state.phase === 'RECAP'    && <RecapPhase    state={state} />}
+        {state.phase === 'BASELINE' && <BaselinePhase state={state} />}
+        {state.phase === 'GALLERY'  && <GalleryPhase  state={state} />}
+        {state.phase === 'REVEAL'   && <RevealPhase   state={state} />}
 
         {showSlides && <SlidesPhase onClose={() => setShowSlides(false)} />}
 

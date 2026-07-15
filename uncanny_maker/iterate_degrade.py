@@ -1,12 +1,22 @@
 """
-Iterative AI degradation — optimised for Apple M4 Max / MPS.
+Two-phase AI degradation — optimised for Apple M4 Max / MPS.
 
-Each image is fed through Stable Diffusion img2img ITERATIONS times.
-The output of each pass becomes the input for the next, so artefacts
-accumulate like a visual game of telephone. LLaVA is called once per
-image to produce an anchoring prompt; the same prompt is reused for
-all 100 iterations so drift is driven by the model's own reconstruction
-errors rather than changing instructions.
+Each artwork yields ITERATIONS pictures in two phases:
+
+  Phase 1 (pictures 1..DIRECT_COUNT)  — each generated DIRECTLY from the
+      original via a single img2img pass with a gentle strength ramp and a
+      per-artwork fixed seed. One VAE roundtrip per picture, so the early
+      pictures stay genuinely close to the source: subtle, coherent drift.
+
+  Phase 2 (pictures DIRECT_COUNT+1..ITERATIONS) — CHAINED: each output
+      becomes the next input (true model collapse). VAE-roundtrip damage
+      and hallucinations compound, so the paint surface degrades and the
+      figure falls apart with accelerating wrongness.
+
+LLaVA is called once per image to produce an anchoring prompt shared by
+all pictures. A pure chain from picture 1 was tested and rejected — the
+compounding roundtrip damage wrecks texture before the drift gets
+interesting; a pure direct ramp lacks the collapse character at the end.
 
 Performance features (M4 Max / MPS):
   • All LLaVA prompts are fetched in parallel before SD starts
@@ -16,10 +26,10 @@ Performance features (M4 Max / MPS):
   • Exponential-moving-average ETA per image
 
 Output:
-    catalog_iterations/<stem>/0000.png  ← original
-    catalog_iterations/<stem>/0001.png  ← iteration 1
+    catalog_iterations_10/<stem>/0000.png  ← original
+    catalog_iterations_10/<stem>/0001.png  ← iteration 1
     …
-    catalog_iterations/<stem>/0100.png  ← iteration 100
+    catalog_iterations_10/<stem>/0010.png  ← iteration 10
 
 The run is resumable: frames already on disk are skipped.
 
@@ -43,14 +53,43 @@ from PIL import Image
 
 # ── Configuration ──────────────────────────────────────────────────────────────
 CATALOG_DIR  = pathlib.Path(__file__).parent / "catalog"
-OUTPUT_ROOT  = pathlib.Path(__file__).parent / "catalog_iterations"
+OUTPUT_ROOT  = pathlib.Path(__file__).parent / "catalog_iterations_10"
 IMAGE_EXTS   = {".jpg", ".jpeg", ".png", ".webp"}
 
-ITERATIONS   = 100    # feedback loops per image
-STRENGTH     = 0.45   # per-iteration change magnitude (0.1 subtle → 0.9 heavy)
-GUIDANCE     = 6.0    # classifier-free guidance scale
-STEPS        = 25     # inference steps per iteration
+ITERATIONS   = 10     # pictures per artwork
+
+# Phase 1 — pictures 1..DIRECT_COUNT are generated DIRECTLY from the original
+# (single img2img pass, fixed seed). This keeps them genuinely close to the
+# source: subtle, coherent drift with exactly one VAE roundtrip each.
+DIRECT_COUNT    = 5
+DIRECT_START    = 0.10  # picture 1: barely perceptible retouch
+DIRECT_END      = 0.30  # picture 5: clearly drifting, still the same painting
+
+# Phase 2 — pictures DIRECT_COUNT+1..ITERATIONS are CHAINED (each output feeds
+# the next input): true model collapse. VAE-roundtrip damage and hallucinations
+# compound, so the paint surface degrades and the figure falls apart fast.
+CHAIN_START     = 0.22  # picture 6: collapse sets in
+CHAIN_END       = 0.42  # picture 10: disintegrated — higher values re-cohere
+                        # into a clean DIFFERENT painting instead of collapsing
+
+GUIDANCE        = 6.0   # classifier-free guidance scale
+STEPS           = 25    # inference steps per picture
 # ──────────────────────────────────────────────────────────────────────────────
+
+
+def _strength_for(i: int) -> float:
+    """Strength schedule across both phases."""
+    if i <= DIRECT_COUNT:
+        t = (i - 1) / max(DIRECT_COUNT - 1, 1)
+        return DIRECT_START + (DIRECT_END - DIRECT_START) * t
+    t = (i - DIRECT_COUNT - 1) / max(ITERATIONS - DIRECT_COUNT - 1, 1)
+    return CHAIN_START + (CHAIN_END - CHAIN_START) * t
+
+
+def _seed_for(stem: str) -> int:
+    """Stable per-artwork seed so reruns reproduce the same sequence."""
+    import zlib
+    return zlib.crc32(stem.encode("utf-8"))
 
 
 # ── Background I/O thread ─────────────────────────────────────────────────────
@@ -82,15 +121,6 @@ class _SaveWorker:
 
 def _all_done(out_dir: pathlib.Path) -> bool:
     return (out_dir / f"{ITERATIONS:04d}.png").exists()
-
-
-def _resume_point(out_dir: pathlib.Path, original: Image.Image):
-    """Return (start_iter, current_frame) for resumable runs."""
-    for n in range(ITERATIONS, 0, -1):
-        frame = out_dir / f"{n:04d}.png"
-        if frame.exists():
-            return n + 1, Image.open(frame).convert("RGB")
-    return 1, original
 
 
 def _fetch_prompt(img_path: pathlib.Path) -> tuple[pathlib.Path, str]:
@@ -132,7 +162,9 @@ def main():
         print("Nothing to do.")
         return
 
-    print(f"Settings: {ITERATIONS} iters · strength={STRENGTH} · guidance={GUIDANCE} · steps={STEPS}\n")
+    print(f"Settings: {ITERATIONS} pictures · direct 1–{DIRECT_COUNT} {DIRECT_START}→{DIRECT_END} "
+          f"· chain {DIRECT_COUNT+1}–{ITERATIONS} {CHAIN_START}→{CHAIN_END} "
+          f"· guidance={GUIDANCE} · steps={STEPS}\n")
 
     # ── Pre-fetch all LLaVA prompts in parallel ────────────────────────────────
     print(f"Fetching LLaVA prompts in parallel ({args.workers} workers)…")
@@ -175,32 +207,47 @@ def main():
 
         original      = Image.open(img_path).convert("RGB")
         original_size = original.size
+        source512     = original.resize((512, 512), Image.LANCZOS)
+        seed          = _seed_for(img_path.stem)
 
         # Frame 0 = unmodified source
         saver.submit(original.copy(), out_dir / "0000.png")
 
-        start_iter, current = _resume_point(out_dir, original)
-        if start_iter > 1:
-            print(f"  Resuming from iteration {start_iter - 1}")
-
         ema_sec: Optional[float] = None
         t0 = time.perf_counter()
+        current512: Optional[Image.Image] = None  # chain input for phase 2
 
-        for i in range(start_iter, ITERATIONS + 1):
+        for i in range(1, ITERATIONS + 1):
+            frame_path = out_dir / f"{i:04d}.png"
+            if frame_path.exists():
+                # Resume: direct pictures are independent; chained ones need
+                # the predecessor as input, so reload it for the next step.
+                if i >= DIRECT_COUNT:
+                    current512 = Image.open(frame_path).convert("RGB").resize((512, 512), Image.LANCZOS)
+                continue
             t_iter = time.perf_counter()
 
-            working = current.resize((512, 512), Image.LANCZOS)
+            working = source512 if i <= DIRECT_COUNT else current512
+            # Direct phase: one fixed seed → coherent drift between pictures.
+            # Chain phase: vary the seed per step — re-injecting the identical
+            # noise pattern into a feedback loop resonates and explodes into
+            # high-frequency artefacts instead of painterly collapse.
+            generator = torch.Generator(pipe.device.type).manual_seed(
+                seed if i <= DIRECT_COUNT else seed + i
+            )
             result  = pipe(
                 prompt            = prompt,
                 image             = working,
-                strength          = STRENGTH,
+                strength          = _strength_for(i),
                 guidance_scale    = GUIDANCE,
                 num_inference_steps = STEPS,
+                generator         = generator,
             ).images[0]
-            current = result.resize(original_size, Image.LANCZOS)
+            if i >= DIRECT_COUNT:
+                current512 = result
 
             # Non-blocking save
-            saver.submit(current.copy(), out_dir / f"{i:04d}.png")
+            saver.submit(result.resize(original_size, Image.LANCZOS), frame_path)
 
             iter_sec = time.perf_counter() - t_iter
             ema_sec  = iter_sec if ema_sec is None else _ema(ema_sec, iter_sec)

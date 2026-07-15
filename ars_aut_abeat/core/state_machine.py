@@ -3,17 +3,17 @@ from dataclasses import dataclass, field
 from typing import Optional
 from config import (
     LOCK_STABILITY_DURATION,
-    INTRO_DURATION,
-    MORPHING_DURATION,
-    RECAP_DURATION,
+    BASELINE_DURATION,
+    GALLERY_DURATION,
+    REVEAL_DURATION,
 )
 
-PHASES = ["IDLE", "INTRO", "MORPHING", "RECAP"]
+PHASES = ["IDLE", "BASELINE", "GALLERY", "REVEAL"]
 
 PHASE_DURATIONS = {
-    "INTRO":    INTRO_DURATION,
-    "MORPHING": MORPHING_DURATION,
-    "RECAP":    RECAP_DURATION,
+    "BASELINE": BASELINE_DURATION,
+    "GALLERY":  GALLERY_DURATION,
+    "REVEAL":   REVEAL_DURATION,
 }
 
 
@@ -23,11 +23,13 @@ class InstallationState:
     phase_entered_at: float = field(default_factory=time.time)
     viewer_session: Optional[object] = None
     avg_emotions: dict = field(default_factory=dict)
+    baseline_emotions: dict = field(default_factory=dict)
+    deviations: list = field(default_factory=list)
+    breaking_index: Optional[int] = None
     personal_verdict: str = ""
     personal_lines: list = field(default_factory=list)
     current_artwork: Optional[dict] = None
     collective_data: Optional[dict] = None
-    recap_graph_b64: Optional[str] = None
     attract_graph_b64: Optional[str] = None
     attract_viewing_count: int = -1
     show_mode: bool = False
@@ -51,21 +53,22 @@ def advance_state(state: InstallationState, camera_state, catalog_manager, db_se
     if phase == "IDLE":
         _handle_idle(state, camera_state, catalog_manager)
 
-    elif phase == "INTRO":
-        if t >= PHASE_DURATIONS["INTRO"]:
-            enter_phase(state, "MORPHING")
+    elif phase == "BASELINE":
+        if camera_state.latest_emotions:
+            state.viewer_session.add_baseline_sample(camera_state.latest_emotions)
+        if t >= PHASE_DURATIONS["BASELINE"]:
+            enter_phase(state, "GALLERY")
             state.viewer_session.started_at = time.time()
 
-    elif phase == "MORPHING":
-        s = state.viewer_session
+    elif phase == "GALLERY":
         if camera_state.latest_emotions:
-            s.add_sample(camera_state.latest_emotions, elapsed=t)
-        if t >= PHASE_DURATIONS["MORPHING"]:
+            state.viewer_session.add_gallery_sample(camera_state.latest_emotions, elapsed=t)
+        if t >= PHASE_DURATIONS["GALLERY"]:
             _finalize_viewing(state, db_session, camera_state)
-            enter_phase(state, "RECAP")
+            enter_phase(state, "REVEAL")
 
-    elif phase == "RECAP":
-        if t >= PHASE_DURATIONS["RECAP"]:
+    elif phase == "REVEAL":
+        if t >= PHASE_DURATIONS["REVEAL"]:
             _reset(state)
             enter_phase(state, "IDLE")
 
@@ -90,24 +93,34 @@ def _handle_idle(state: InstallationState, camera_state, catalog_manager):
     session = ViewerSession(artwork_id=artwork["id"], artwork_slug=artwork["slug"])
     state.viewer_session = session
     state.current_artwork = artwork
-    state.recap_graph_b64 = None
-    enter_phase(state, "INTRO")
+    enter_phase(state, "BASELINE")
 
 
 def _finalize_viewing(state: InstallationState, db_session, camera_state):
     from vision.emotion import average_samples
-    from core.verdict import score_emotions, verdict_label, personal_verdict_text, save_viewing, collective_summary
+    from core.verdict import (
+        find_breaking_point, verdict_from_deviation,
+        personal_verdict_text, save_viewing, collective_summary,
+    )
 
     s = state.viewer_session
-    avg = average_samples(s.emotion_samples)
-    score = score_emotions(avg)
-    label = verdict_label(score)
+    baseline = average_samples(s.baseline_samples)
+    bucket_avgs = [average_samples(bucket) for bucket in s.gallery_buckets]
+    breaking_index, deviations = find_breaking_point(bucket_avgs, baseline)
+    max_dev = max(deviations) if deviations else 0.0
+    label = verdict_from_deviation(max_dev, breaking_index)
 
+    avg = average_samples(s.emotion_samples)
     state.avg_emotions = avg
+    state.baseline_emotions = baseline
+    state.deviations = deviations
+    state.breaking_index = breaking_index
     state.personal_verdict = label
     state.personal_lines = personal_verdict_text(avg)
 
-    save_viewing(s, avg, label, db_session, num_faces=max(1, camera_state.num_faces))
+    save_viewing(s, avg, label, db_session,
+                 num_faces=max(1, camera_state.num_faces),
+                 breaking_index=breaking_index)
 
     coll = collective_summary(s.artwork_id, avg, db_session)
     state.collective_data = coll
@@ -116,8 +129,10 @@ def _finalize_viewing(state: InstallationState, db_session, camera_state):
 def _reset(state: InstallationState):
     state.viewer_session = None
     state.avg_emotions = {}
+    state.baseline_emotions = {}
+    state.deviations = []
+    state.breaking_index = None
     state.personal_verdict = ""
     state.personal_lines = []
     state.current_artwork = None
     state.collective_data = None
-    state.recap_graph_b64 = None

@@ -7,11 +7,11 @@
 
 ## TL;DR — What this project does (for the confused colleague)
 
-**In one sentence:** Visitors stand in front of a giant screen, raise their hands, and watch a classical painting get slowly distorted by AI while their facial micro-expressions are silently recorded; at the end a "verdict" tells them how far they fell into the uncanny valley.
+**In one sentence:** Visitors look at a classical painting while their emotional baseline is read, then walk through ten increasingly AI-distorted versions of it; the picture that provokes their strongest reaction becomes the verdict — everything before it was art (**ARS**), from there on it no longer is (**ABEAT**).
 
 **What runs:** A FastAPI + React web app on a PC connected to a camera. The browser captures video, sends frames over WebSocket to a Python backend, which runs face/emotion analysis in real time, drives a state machine through four phases, and pushes results back to the frontend.
 
-**How the distorted images are made:** A one-time offline pipeline (`uncanny_maker`) runs each painting through Stable Diffusion img2img 100 times in a feedback loop — each output becomes the next input. Errors compound; the result is a body that is simultaneously too-human and deeply wrong.
+**How the distorted images are made:** A one-time offline pipeline (`uncanny_maker`) generates 10 pictures per painting with Stable Diffusion img2img in two phases: pictures 1–5 each directly from the original with a gentle strength ramp (subtle, coherent drift), pictures 6–10 chained output-to-input — true model collapse, where reconstruction errors compound and the painting disintegrates. The result is a body that is simultaneously too-human and deeply wrong.
 
 **What "uncanny valley" means here:** Roboticist Masahiro Mori (1970) described how a near-perfect human likeness triggers revulsion more than a clearly non-human one. We measure that response in real visitors, one face at a time.
 
@@ -20,28 +20,34 @@
 ## The Experience (Visitor Perspective)
 
 ```
- IDLE        65-inch portrait TV shows a mirror view of visitors.
-             Aggregate data from previous visitors scrolls past every 30 s.
+ IDLE        Large display shows a mirror view of visitors.
+             Attract screen cycles every 30 s.
                │
                │  visitor raises both hands for 1.5 s
+               │  (or presenter presses Space in show mode)
                ▼
- INTRO       "THIS IS — [artwork title]"
-             Full-screen original painting for 8 s.
-             Text: "We will now give this picture to an AI. It will try to
-             recreate the same picture — over 100 times."
+ BASELINE    "THIS IS — [artwork title]"
+             The untouched original for 19 s with title and description
+             to read. Meanwhile the camera reads the visitor's
+             face and stores the average as their personal baseline —
+             their expression when looking at real art.
                │
                ▼
- MORPHING    The painting slowly transforms through 100 AI-distorted frames (30 s).
-             Live emotion bars (happy, sad, fear, disgust, …) float on the right —
-             the visitor can see their face being read in real time.
+ GALLERY     Ten AI-degraded pictures, soft crossfade every 3 s (30 s) —
+             like walking past ten works in a gallery. Each picture collects
+             its own bucket of emotion samples (0.7 s reaction-lag offset).
+             Live emotion bars float on the right.
                │
                ▼
- RECAP       Before/after thumbnails side by side.
-             Emotion-over-time line chart.
-             A wax-seal verdict:
-               VALLIS  — you fell into the valley
-               LIMEN   — you stood at the threshold
-               FIRMA   — you held your ground
+ REVEAL      The picture whose bucket deviates most from the baseline is
+             the breaking point. Three pictures side by side:
+               ORIGINAL        — the human hand
+               ARS    (gold)   — the last picture that was still art
+               ABEAT  (red)    — the breaking point, strongest reaction
+             Below: a reaction curve over all ten pictures.
+             "HERE, ART DIED FOR YOU — your strongest reaction:
+              picture k of 10. You drew this line — not the machine."
+             No reaction at all → ARS MANSIT: it never stopped being art.
                │
                ▼
  IDLE        Resets. Waits for the next visitor.
@@ -57,18 +63,18 @@
 │   ├── backend/            FastAPI server: WebSocket handler, graph generation
 │   ├── core/               Phase state machine, per-session data, verdict scoring
 │   ├── vision/             MediaPipe emotion detection, head-pose gaze gate
-│   ├── catalog/            Artwork loader — maps source images to 100-frame sequences
+│   ├── catalog/            Artwork loader — maps source images to 10-picture sequences
 │   ├── data/               SQLAlchemy ORM, SQLite persistence, aggregate analytics
 │   ├── frontend/           React + TypeScript + Vite UI
 │   │   └── src/
 │   │       ├── hooks/      useWebSocket.ts, useCamera.ts
-│   │       └── components/ IdlePhase, IntroPhase, MorphingPhase, RecapPhase
+│   │       └── components/ IdlePhase, BaselinePhase, GalleryPhase, RevealPhase, SlidesPhase
 │   ├── start.sh            Production launcher (builds frontend, starts server, opens kiosk)
 │   ├── install.sh          One-time Ubuntu/Debian setup
 │   └── config.py           All tunable parameters (timings, thresholds, weights)
 │
 ├── uncanny_maker/          Offline preprocessing pipeline (run once)
-│   ├── iterate_degrade.py  Main script — 100-frame iterative Stable Diffusion loop
+│   ├── iterate_degrade.py  Main script — 10 pictures per artwork (5 direct + 5 chained collapse)
 │   ├── download_human_figures.py  Met Museum API scraper
 │   ├── core/               Stable Diffusion img2img + LLaVA prompt generation
 │   └── catalog/            Source artwork JPEGs (downloaded by scraper)
@@ -77,7 +83,7 @@
 └── docs/
     ├── CONCEPT.md          Philosophy, the uncanny valley, model collapse as art
     ├── ARCHITECTURE.md     Technical architecture, data flow, all modules explained
-    └── PIPELINE.md         Preprocessing pipeline — how the 100-frame sequences are made
+    └── PIPELINE.md         Preprocessing pipeline — how the 10-picture sequences are made
 ```
 
 ---
@@ -134,16 +140,17 @@ pip install -r requirements.txt
 # Step 1 — download ~200 figurative paintings/sculptures from Met Museum Open Access
 python download_human_figures.py
 
-# Step 2 — run each image through 100 Stable Diffusion feedback iterations
+# Step 2 — generate 10 pictures per image:
+#          1–5 direct from the original (subtle drift), 6–10 chained model collapse
 ollama serve &          # optional — provides better prompts via LLaVA
 python iterate_degrade.py
 ```
 
-Output: `uncanny_maker/catalog_iterations/{artwork_slug}/0000.png … 0100.png`
+Output: `uncanny_maker/catalog_iterations_10/{artwork_slug}/0000.png … 0010.png`
 
 Both scripts are **fully resumable** — interrupted runs continue from where they stopped.
 
-Estimated time per artwork: ~8–12 min on Apple M-series, ~3–6 min on NVIDIA GPU.
+Estimated time per artwork: ~1 min on Apple M-series, ~30 s on NVIDIA GPU.
 
 ---
 
@@ -162,33 +169,38 @@ Estimated time per artwork: ~8–12 min on Apple M-series, ~3–6 min on NVIDIA 
 | Database | SQLite via SQLAlchemy 2.0 |
 | Charts | Matplotlib → base64 PNG |
 | Art source | Met Museum Open Access API (public domain) |
-| Display | 65-inch TV, portrait orientation (112:199 aspect ratio) |
+| Display | Large landscape display / video wall, 16:9 |
 
 ---
 
-## Verdict System
+## Verdict System — the Breaking Point
 
-At the end of each 30-second session the visitor's emotion samples are averaged and scored:
+During BASELINE the visitor's average emotion vector is stored as their personal zero point. During GALLERY each of the 10 pictures collects its own bucket of emotion samples. At reveal time every bucket is compared to the baseline:
 
 ```
-score = normalize( Σ (emotion_probability × weight) )   →   [0, 1]
+deviation(picture k) = Σ over emotions  weight[e] × |bucket_avg_k[e] − baseline[e]|
+breaking point       = picture with maximum deviation
 ```
 
 | Emotion | Weight | Rationale |
 |---------|--------|-----------|
-| Disgust | +1.0 | Core uncanny signal |
-| Fear | +0.9 | Threat response |
-| Surprise | +0.4 | Ambiguous |
-| Sad | +0.2 | Mild negative |
-| Angry | −0.1 | Neutral |
-| Neutral | −0.4 | No reaction |
-| Happy | −1.0 | Counter-signal |
+| Disgust | 1.0 | Core uncanny signal |
+| Fear | 0.9 | Threat response |
+| Surprise | 0.7 | Strong involuntary reaction |
+| Angry | 0.6 | Rejection |
+| Sad | 0.5 | Negative shift |
+| Happy | 0.5 | A laugh is also a reaction |
+| Neutral | 0.2 | Mostly absorbs the others' movement |
 
-| Score | Verdict | Meaning |
-|-------|---------|---------|
-| ≥ 0.60 | **VALLIS** | Fell into the uncanny valley |
-| 0.40 – 0.59 | **LIMEN** | At the threshold |
-| < 0.40 | **FIRMA** | Unaffected, stable ground |
+Any *change* from the baseline counts as a reaction — the weights only decide how much.
+
+| Condition | Verdict | Meaning |
+|-----------|---------|---------|
+| max deviation ≥ 0.25 | **VALLIS** | Strong reaction — fell into the valley |
+| breaking point exists, < 0.25 | **LIMEN** | Measurable but mild — at the threshold |
+| max deviation < 0.08 | **FIRMA** | *ARS MANSIT* — it never stopped being art |
+
+The reveal screen shows the breaking-point picture stamped **ABEAT** (no longer art) next to the picture before it, stamped **ARS** (still art). The visitor — not the machine — drew the line.
 
 ---
 
@@ -218,5 +230,5 @@ Deliberately anachronistic — a 21st-century computer-vision experiment dressed
 
 - **Fonts:** Cinzel (inscriptions), Cormorant Garamond (body text), Pinyon Script (flourishes)
 - **Palette:** Ink black `#1C1410` · Parchment `#F4E8D0` · Gold `#C9A961` · Burgundy `#6B2C2C`
-- **Layout:** `112:199` portrait column centred on the landscape display with black bars
+- **Layout:** `16:9` landscape viewport, letterboxed on non-16:9 screens
 - **Text scale:** CSS `clamp()` throughout — readable from phone screen to 65-inch projection

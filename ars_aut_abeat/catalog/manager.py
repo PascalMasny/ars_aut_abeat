@@ -1,13 +1,13 @@
 from pathlib import Path
 from sqlalchemy import func
 from config import (
-    UNCANNY_OG_DIR, UNCANNY_20_DIR, UNCANNY_60_DIR, UNCANNY_80_DIR,
+    UNCANNY_OG_DIR, UNCANNY_ITER_DIR, UNCANNY_20_DIR, UNCANNY_60_DIR, UNCANNY_80_DIR,
     FRAME_COUNT,
 )
 from data.db import get_session
 from data.models import Artwork, Viewing
 
-_ITERATIONS_ROOT = UNCANNY_OG_DIR.parent / "catalog_iterations"
+_ITERATIONS_ROOT = UNCANNY_ITER_DIR
 
 _manager: "CatalogManager | None" = None
 

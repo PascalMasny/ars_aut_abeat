@@ -1,8 +1,11 @@
 import json
-from config import VERDICT_VALLIS_THRESHOLD, VERDICT_FIRMA_THRESHOLD, EMOTION_LATIN
+from config import (
+    VERDICT_VALLIS_THRESHOLD, VERDICT_FIRMA_THRESHOLD, EMOTION_LATIN,
+    BREAKING_WEIGHTS, BREAKING_MIN_DEVIATION, VERDICT_VALLIS_DEVIATION,
+)
 from data.stats import artwork_summary, concordance, _score
 from data.models import Viewing
-from vision.emotion import dominant_emotion
+from vision.emotion import dominant_emotion, EMOTION_KEYS
 
 
 def score_emotions(emotions: dict[str, float]) -> float:
@@ -20,6 +23,42 @@ def verdict_label(score: float) -> str:
     return "FIRMA"
 
 
+def deviation_score(emotions: dict[str, float], baseline: dict[str, float]) -> float:
+    """Weighted absolute deviation of an emotion vector from the baseline."""
+    return sum(
+        BREAKING_WEIGHTS.get(k, 0.0) * abs(emotions.get(k, 0.0) - baseline.get(k, 0.0))
+        for k in EMOTION_KEYS
+    )
+
+
+def find_breaking_point(
+    bucket_avgs: list[dict[str, float]], baseline: dict[str, float]
+) -> tuple[int | None, list[float]]:
+    """Picture (1-based) where the viewer's emotions deviated most from baseline.
+
+    Returns (None, deviations) when no picture provoked a deviation above
+    BREAKING_MIN_DEVIATION — for this viewer, it never stopped being art.
+    """
+    deviations = [
+        deviation_score(avg, baseline) if avg else 0.0
+        for avg in bucket_avgs
+    ]
+    if not baseline or not any(deviations):
+        return None, deviations
+    best = max(range(len(deviations)), key=lambda i: deviations[i])
+    if deviations[best] < BREAKING_MIN_DEVIATION:
+        return None, deviations
+    return best + 1, deviations
+
+
+def verdict_from_deviation(max_deviation: float, breaking_index: int | None) -> str:
+    if breaking_index is None:
+        return "FIRMA"
+    if max_deviation >= VERDICT_VALLIS_DEVIATION:
+        return "VALLIS"
+    return "LIMEN"
+
+
 def personal_verdict_text(emotions: dict[str, float]) -> list[tuple[str, float]]:
     """Returns sorted list of (latin_name, pct) for display."""
     lines = []
@@ -29,7 +68,8 @@ def personal_verdict_text(emotions: dict[str, float]) -> list[tuple[str, float]]
     return lines
 
 
-def save_viewing(session_obj, avg_emotions: dict, verdict: str, db_session, num_faces: int = 1):
+def save_viewing(session_obj, avg_emotions: dict, verdict: str, db_session,
+                 num_faces: int = 1, breaking_index: int | None = None):
     v = Viewing(
         artwork_id=session_obj.artwork_id,
         session_id=session_obj.session_id,
@@ -38,6 +78,7 @@ def save_viewing(session_obj, avg_emotions: dict, verdict: str, db_session, num_
         dominant_emotion=dominant_emotion(avg_emotions),
         verdict=verdict,
         num_faces_in_frame=num_faces,
+        breaking_index=breaking_index,
     )
     db_session.add(v)
     db_session.commit()

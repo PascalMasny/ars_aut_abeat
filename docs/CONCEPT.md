@@ -12,15 +12,19 @@ This installation is built around a single, uncomfortable observation: the human
 
 ## The Core Idea
 
-A classical artwork — a painting or sculpture of the human figure — is fed into an AI. The AI's output is fed back in as the new input. This repeats one hundred times.
+A classical artwork — a painting or sculpture of the human figure — is handed to an AI ten times. The first five pictures give the machine a little more freedom each time: near-faithful retouches that drift subtly. From the sixth picture on, the machine is fed its own output — and its reconstruction errors compound until the painting disintegrates.
 
 Each cycle the image drifts. Features smooth. Proportions shift almost imperceptibly. The light changes in ways that are hard to name. The figure remains recognisably human — but *something is off*. The AI has learned what a human body looks like from millions of images, and it reconstructs that knowledge imperfectly, accumulating its own errors with each pass. The result is a body that the machine has tried to understand and failed — and in that failure, something genuinely disturbing emerges.
 
-The visitor watches this happen. Their face is read throughout, silently, at ten frames per second. Micro-expressions — the involuntary flickers of disgust, fear, and unease that precede conscious awareness — are recorded and scored. At the end, the installation renders a verdict:
+The visitor first looks at the untouched original while their face is read, silently, at ten frames per second — this is their **baseline**: their expression in front of real art. Then the ten degraded pictures follow, one every three seconds, like walking past ten works in a gallery. Each picture is measured against the baseline. The picture that provokes the strongest involuntary deviation — the flicker of disgust, fear, or unease that precedes conscious awareness — is that visitor's **breaking point**.
 
-- **VALLIS** — you fell into the valley
-- **LIMEN** — you stood at the threshold
-- **FIRMA** — you held your ground
+The reveal names it without mercy: the picture before the breaking point is stamped **ARS** — still art. The breaking point itself is stamped **ABEAT** — no longer art. *Ars aut abeat*: art, or it departs. The visitor drew this line, not the machine.
+
+Three seals summarise the depth of the fall:
+
+- **VALLIS** — a strong reaction; you fell into the valley
+- **LIMEN** — a measurable but mild reaction; you stood at the threshold
+- **FIRMA** — no picture moved you; *ars mansit*, it never stopped being art
 
 No visitor is told what the camera is doing until after. The honesty of the response depends on that.
 
@@ -44,7 +48,7 @@ The starting images are classical paintings and sculptures sourced from the Metr
 
 Classical figurative art already represents a human interpretation of the human body — idealised, stylised, filtered through technique and tradition. These images are one step removed from reality. They carry the weight of how *another human* decided the body should look.
 
-Feeding this into an AI creates a second layer of interpretation: how the machine decides a body should look, based on what it has absorbed from human culture at large. The iterative feedback loop compounds both interpretations against each other, generation after generation, until the gap between representation and reality becomes visible — and visceral.
+Feeding this into an AI creates a second layer of interpretation: how the machine decides a body should look, based on what it has absorbed from human culture at large. As the machine's freedom grows picture by picture, the two interpretations pull apart, until the gap between them becomes visible — and visceral.
 
 The visitor is not looking at a distorted photograph of a real person. They are looking at the accumulated distance between two different kinds of understanding: human and machine. That distance, when it becomes large enough, is the uncanny valley.
 
@@ -58,7 +62,7 @@ When an AI model's own output is used as input for the next generation — recur
 
 The result is not random degradation. It is *directed* degradation: the image drifts toward the model's internal prototype of a human body. Faces become more symmetrical than any real face. Skin textures smooth toward an idealised average. Proportions correct themselves against a learned norm. And yet artefacts accumulate in the opposite direction — the light grows wrong, edges soften where they should be sharp, details multiply where they should simplify.
 
-This is model collapse used deliberately. Where AI safety researchers identify it as a failure mode to be avoided, *Vallis Simulacri* treats it as a compositional tool. The hundred-frame sequence does not degrade randomly — it traces a specific trajectory: from human original, through machine-idealised average, toward something that is simultaneously more and less human than either.
+*Vallis Simulacri* harnesses this drift deliberately and dosages it. The first five pictures are generated directly from the original with a fixed seed — the same hallucination, administered in increasing strength, a slow approach. The last five are a literal feedback chain: each output becomes the next input, and model collapse takes over — reconstruction damage compounds, the paint surface disintegrates, the figure falls apart while its composition survives. The sequence traces the valley itself: a slow approach, then a plunge.
 
 The visitor watches this trajectory unfold in real time. What they are seeing is not corruption. It is the model showing, iteration by iteration, the distance between its representation and the reality it was trained to approximate. That distance, made visible, is the uncanny valley.
 
@@ -77,11 +81,11 @@ But the deeper question Mori's work opens is not about the machine. It is about 
 The installation inherits this tradition but makes it empirical. Rather than theorising about when the uncanny fires, it measures it. Every visitor produces data. Every viewing is a data point in a collective portrait of the human response to its own distorted likeness.
 
 **What we want to know:**
-- At which iteration — which stage of morphing — does the body tip from familiar to wrong?
+- At which picture — which of the ten degradation steps — does the body tip from familiar to wrong? This is measured directly: every viewing stores a breaking point.
 - Is disgust the primary signal, or is it fear? Or something more ambiguous?
 - Do some classical representations of the body resist the valley longer than others?
 - Does the response vary by visitor?
-- Is there a collective threshold — a point where most humans agree that something has gone wrong?
+- Is there a collective threshold — a picture where most humans agree that something has gone wrong? A histogram of breaking points per artwork answers this.
 
 These are not rhetorical questions. The database answers them, visitor by visitor.
 
@@ -89,7 +93,7 @@ These are not rhetorical questions. The database answers them, visitor by visito
 
 ## What the Installation Achieves
 
-**Individually**: Each visitor receives a personal record of their emotional descent — a graph of which emotions rose and when, and a Latin verdict that names where they stood in relation to the valley. This is not presented as a score. It is presented as a portrait.
+**Individually**: Each visitor receives a personal answer to the question in the title — the exact picture where art stopped being art *for them*, shown side by side with the last picture that still was. This is not presented as a score. It is presented as a portrait: their own threshold, made visible.
 
 **Collectively**: Every session adds to a growing dataset. Over the course of an exhibition, the installation builds a crowd-level picture of the human uncanny response. The attract screen — shown between sessions — displays this data live: how many souls have passed through, how they broke down across the three verdicts, what the average emotional profile looks like.
 
@@ -109,4 +113,4 @@ The camera sees the visitor. The visitor sees the image change. Neither sees the
 
 ## In One Sentence
 
-**Vallis Simulacri** feeds classical human figures into an AI loop until they become wrong, and watches your face to find out when you notice.
+**Vallis Simulacri** feeds classical human figures into an AI loop until they become wrong, and watches your face to find the exact picture where you notice — the picture where, for you, art dies.

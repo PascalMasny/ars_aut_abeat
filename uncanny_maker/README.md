@@ -1,6 +1,6 @@
 # uncanny_maker
 
-Offline preprocessing pipeline for *Vallis Simulacri*. Downloads public-domain artworks from the Met Museum Open Access API and generates 100-frame AI-degradation sequences used by the gallery application.
+Offline preprocessing pipeline for *Vallis Simulacri*. Downloads public-domain artworks from the Met Museum Open Access API and generates 10-picture AI-degradation sequences used by the gallery application.
 
 Run this once before the first installation session, or again whenever you want to expand the artwork catalog.
 
@@ -31,15 +31,25 @@ python download_human_figures.py
 
 Queries the Met Museum API for ~200 public-domain works featuring human figures (classical sculpture, Renaissance portraits, figurative paintings) and saves them to `catalog/`. Already-downloaded images are skipped, so the script is safe to re-run.
 
-### Step 2 — Generate degradation sequences
+### Step 2 — Test the curve on one artwork
+
+```bash
+python test_single.py catalog/<image>.jpg
+```
+
+Generates a single sequence into `catalog_iterations_10_TEST/` with the exact
+pipeline settings so the degradation curve can be judged visually before
+committing to a full run. Delete the TEST directory afterwards.
+
+### Step 3 — Generate degradation sequences
 
 ```bash
 python iterate_degrade.py
 ```
 
-For each image in `catalog/`, runs 100 rounds of Stable Diffusion img2img, feeding each output back as the next input. Output frames are saved to `catalog_iterations/<slug>/0000.png` … `0100.png`.
+For each image in `catalog/`, generates 10 pictures with Stable Diffusion img2img in two phases: **pictures 1–5 directly from the original** (strength 0.10 → 0.30, fixed per-artwork seed — subtle coherent drift) and **pictures 6–10 chained** output-to-input (strength 0.22 → 0.42, per-step seeds — true model collapse, the paint disintegrates while the composition survives). Output frames are saved to `catalog_iterations_10/<slug>/0000.png` … `0010.png`.
 
-Resumable: frames already on disk are skipped. Interrupted runs continue from where they left off.
+Resumable: frames already on disk are skipped; an artwork is considered done when its `0010.png` exists. Interrupted runs continue from where they left off. Delete an artwork's output directory to force regeneration.
 
 **Options:**
 
@@ -52,8 +62,10 @@ Resumable: frames already on disk are skipped. Interrupted runs continue from wh
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ITERATIONS` | `100` | Feedback loops per image |
-| `STRENGTH` | `0.45` | Per-iteration change magnitude |
+| `ITERATIONS` | `10` | Pictures per artwork |
+| `DIRECT_COUNT` | `5` | Pictures generated directly from the original |
+| `DIRECT_START` / `DIRECT_END` | `0.10` / `0.30` | Strength ramp, direct phase |
+| `CHAIN_START` / `CHAIN_END` | `0.22` / `0.42` | Strength ramp, chained phase (>~0.5 re-coheres into a different painting) |
 | `GUIDANCE` | `6.0` | Classifier-free guidance scale |
 | `STEPS` | `25` | Inference steps (speed vs. quality) |
 
@@ -61,37 +73,41 @@ Resumable: frames already on disk are skipped. Interrupted runs continue from wh
 
 Device is detected automatically: **MPS** (Apple Silicon) → **CUDA** → **CPU**.
 
-Approximate runtimes per image at default settings:
+Approximate runtimes per image at default settings (10 iterations):
 
 | Hardware | Time |
 |----------|------|
-| M4 Max (MPS) | ~8–12 min |
-| NVIDIA GPU (CUDA) | ~3–6 min |
-| CPU only | ~60–120 min |
+| M4 Max (MPS) | ~1 min |
+| NVIDIA GPU (CUDA) | ~30 s |
+| CPU only | ~10 min |
 
 ## Output
 
 ```
-catalog_iterations/
+catalog_iterations_10/
 └── The_Dance_Class_438817/
-    ├── 0000.png   ← original (unmodified)
-    ├── 0001.png
+    ├── 0000.png   ← original (unmodified) — shown during BASELINE
+    ├── 0001.png   ← direct, strength 0.10
     │   …
-    └── 0100.png   ← after 100 iterations
+    ├── 0005.png   ← direct, strength 0.30
+    │   …
+    └── 0010.png   ← chained, disintegrated
 ```
 
-`catalog_iterations/` is excluded from version control (~10 GB). Copy or symlink it to where `ars_aut_abeat` can find it, or set the path in `ars_aut_abeat/config.py`.
+`catalog_iterations_10/` is excluded from version control. The app reads it via `UNCANNY_ITER_DIR` in `ars_aut_abeat/config.py`. The older 50/100-frame sets in `catalog_iterations/` are an archive of the previous concept and are no longer read.
 
 ## Directory Structure
 
 ```
 uncanny_maker/
 ├── iterate_degrade.py          Main degradation script
+├── test_single.py              One-artwork visual test of the current settings
 ├── download_human_figures.py   Met Museum scraper
 ├── config.py                   Ollama / SD model settings
 ├── requirements.txt
 ├── catalog/                    Source images (git-ignored, ~400 MB)
-├── catalog_iterations/         Generated sequences (git-ignored, ~10 GB)
+├── catalog_iterations_10/      Generated 10-picture sequences (git-ignored)
+├── catalog_iterations/         Old 50/100-frame sequences (archive, unused)
 ├── core/
 │   ├── llm.py                  LLaVA prompt generation via Ollama
 │   └── transform.py            Stable Diffusion img2img wrapper

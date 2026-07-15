@@ -12,8 +12,8 @@ export function IdlePhase({ state }: Props) {
           <div className="vignette" />
         </div>
         <div className="phase-right">
-          <div className="attract-title">VALLIS · SIMVLACRI</div>
-          <div className="attract-tagline">The Valley of Likeness</div>
+          <div className="attract-title">THE VALLEY OF LIKENESS</div>
+          <div className="attract-tagline">Where does art end?</div>
           <div className="divider">❧ · · · ❧</div>
           <div className="attract-concept">
             In 1970, roboticist Masahiro Mori described the <em>uncanny valley</em> —
@@ -70,12 +70,25 @@ export function IdlePhase({ state }: Props) {
     hint = 'Raise both hands to accept and begin.'
   }
 
+  const steps: [string, string][] = state.show_mode
+    ? [
+        ['1', 'A painting appears — study it while your baseline is read'],
+        ['2', 'Ten AI versions follow, each taking more liberties'],
+        ['3', 'Your face decides where it stops being art'],
+      ]
+    : [
+        ['1', 'Raise both hands — your consent to be measured'],
+        ['2', 'A painting appears — study it while your calm face becomes the baseline'],
+        ['3', 'Ten AI versions follow, one every three seconds, each taking more liberties'],
+        ['4', 'Your strongest reaction marks the picture where art ends — for you'],
+      ]
+
   return (
     <div className="phase-layout">
       <div className="phase-left">
         <div className="vignette" />
         <div className="mirror-top">
-          <div className="mirror-title">VALLIS · SIMVLACRI</div>
+          <div className="mirror-title">THE VALLEY OF LIKENESS</div>
           <div className="mirror-divider">❧ · · ❧</div>
         </div>
       </div>
@@ -88,8 +101,17 @@ export function IdlePhase({ state }: Props) {
           </div>
           <div className="mirror-hint">{hint}</div>
           <div className="divider">❧ · · ❧</div>
-          <div className="mirror-script">Vallis Simulacri</div>
-          <div className="mirror-subtitle">THE VALLEY OF LIKENESS</div>
+          <div className="idle-steps">
+            {steps.map(([num, text]) => (
+              <div className="idle-step" key={num}>
+                <span className="idle-step-num">{num}</span>
+                <span>{text}</span>
+              </div>
+            ))}
+          </div>
+          <div className="divider">❧ · · ❧</div>
+          <div className="mirror-script">Where does art end?</div>
+          <div className="mirror-subtitle">AN EXPERIMENT IN PERCEPTION</div>
         </div>
       </div>
     </div>

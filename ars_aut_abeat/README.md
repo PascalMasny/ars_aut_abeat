@@ -1,8 +1,8 @@
 # Vallis Simulacri
 
-**"The Valley of Likeness."** An interactive gallery installation that measures how deeply visitors fall into the uncanny valley when confronted with AI-degraded classical artworks. Facial emotion detection runs in real time and renders a Latin verdict sealed in wax.
+**"The Valley of Likeness."** An interactive gallery installation that finds the exact picture at which art stops being art — for each visitor personally. A classical artwork is shown, then ten AI-degraded versions of it. Facial emotion detection measures the visitor's deviation from their own baseline, and the picture that provoked the strongest reaction becomes the verdict: everything before it was art (*ARS*), from there on it no longer is (*ABEAT*).
 
-Designed for projection on a large display. Visitors see themselves full-screen, raise both hands to enter the valley, then receive a personal and collective verdict.
+Designed for projection on a large display. Visitors see themselves full-screen, raise both hands to begin, and receive a personal breaking-point verdict.
 
 ---
 
@@ -20,9 +20,21 @@ Designed for projection on a large display. Visitors see themselves full-screen,
 ```
 
 - **Production:** open `http://localhost:8000`
-- **Dev:** open `http://localhost:5173` (Vite proxies `/ws` and `/frames` to :8000)
+- **Dev:** open `http://localhost:5173` (Vite proxies `/ws`, `/frames` and `/api` to :8000)
 
 > **First run:** MediaPipe models (~20 MB each) are downloaded automatically on first startup. The face/pose models download in the background on the analysis thread — you will see the app load immediately, but face detection becomes active ~10–30 s later depending on your connection.
+
+---
+
+## The Experience
+
+```
+IDLE → BASELINE (19 s) → GALLERY (30 s) → REVEAL (25 s) → IDLE
+```
+
+1. **BASELINE** — the visitor sees the untouched original for 19 seconds, with title, artist and a short description to read. Meanwhile the camera silently samples their emotions; the average becomes their personal **baseline** — their face at rest, looking at real art.
+2. **GALLERY** — ten AI-degraded pictures, one every 3 seconds with a soft crossfade, like walking past ten works in a gallery. Each picture's emotion samples are collected into a separate bucket (offset by a 0.7 s reaction lag, since the face trails the change).
+3. **REVEAL** — the picture whose bucket deviates most from the baseline is the **breaking point**. Three pictures side by side: the original, the picture before the break stamped **ARS** (still art), and the breaking point stamped **ABEAT** (no longer art) — followed by an animated reaction curve over all ten pictures. If no picture moved the visitor beyond the threshold, the original is shown with **ARS MANSIT** — for them, it never stopped being art.
 
 ---
 
@@ -31,9 +43,9 @@ Designed for projection on a large display. Visitors see themselves full-screen,
 ```
 ars_aut_abeat/
 ├── backend/
-│   ├── main.py         ← FastAPI app: WebSocket endpoint, static file serving
+│   ├── main.py         ← FastAPI app: WebSocket endpoint, static files, /api/mode + /api/trigger
 │   ├── ws_handler.py   ← GallerySession, singleton processor + state
-│   └── graphs.py       ← matplotlib → base64 PNG (recap graph, attract graph)
+│   └── graphs.py       ← matplotlib → base64 PNG (attract graph)
 ├── frontend/           ← React + Vite + TypeScript
 │   └── src/
 │       ├── hooks/
@@ -42,13 +54,14 @@ ars_aut_abeat/
 │       └── components/
 │           ├── CameraBackground.tsx  ← always mounted, drives 10 Hz capture
 │           ├── IdlePhase.tsx         ← left: camera mirror; right: status / attract content
-│           ├── IntroPhase.tsx        ← left: artwork image; right: AI explanation text
-│           ├── MorphingPhase.tsx     ← left: 50-frame rAF crossfade; right: live emotion bars
-│           └── RecapPhase.tsx        ← left: before/after thumbnails; right: graph + verdict seal
+│           ├── BaselinePhase.tsx     ← left: original artwork; right: calibration text + progress
+│           ├── GalleryPhase.tsx      ← left: crossfading picture sequence; right: live emotion bars
+│           ├── RevealPhase.tsx       ← ORIGINAL/ARS/ABEAT triptych + reaction plot
+│           └── SlidesPhase.tsx       ← in-app presentation deck (German), toggled via UI button
 ├── core/
 │   ├── state_machine.py  ← InstallationState dataclass, phase FSM
-│   ├── session.py        ← ViewerSession (per-visitor emotion samples)
-│   └── verdict.py        ← VALLIS / LIMEN / FIRMA scoring
+│   ├── session.py        ← ViewerSession (baseline samples + per-picture buckets)
+│   └── verdict.py        ← deviation scoring, breaking point, VALLIS / LIMEN / FIRMA
 ├── vision/
 │   ├── camera.py         ← GalleryProcessor: push_frame(), analysis thread
 │   ├── emotion.py        ← MediaPipe blendshapes → 7 emotions (FACS)
@@ -57,7 +70,7 @@ ars_aut_abeat/
 ├── catalog/
 │   └── manager.py        ← round-robin artwork picker, singleton
 ├── data/
-│   ├── db.py             ← SQLite init (SQLAlchemy)
+│   ├── db.py             ← SQLite init (SQLAlchemy) + column migrations
 │   ├── models.py         ← Artwork, Viewing tables
 │   └── stats.py          ← aggregate queries, concordance score
 ├── config.py             ← all timings, thresholds, paths
@@ -71,19 +84,23 @@ ars_aut_abeat/
 ## State Machine
 
 ```
-IDLE → INTRO (8 s) → MORPHING (30 s) → RECAP (15 s) → IDLE
+IDLE → BASELINE (19 s) → GALLERY (30 s) → REVEAL (25 s) → IDLE
 ```
 
-| Phase | Duration | Trigger |
-|-------|----------|---------|
-| **IDLE** | Indefinite | Both hands raised ≥ 1.5 s |
-| **INTRO** | 8 s | Timer — artwork reveal, frames preloaded |
-| **MORPHING** | 30 s | Timer — 50-frame rAF crossfade, live emotion bars |
-| **RECAP** | 15 s | Timer — before/after thumbnails, emotion graph, verdict seal |
+| Phase | Duration | Trigger / What happens |
+|-------|----------|------------------------|
+| **IDLE** | Indefinite | Both hands raised ≥ 1.5 s (or Space in show mode) |
+| **BASELINE** | 19 s | Original + title/description shown; emotions sampled into `baseline_samples`; frontend preloads all 11 frames |
+| **GALLERY** | 30 s | 10 pictures, soft crossfade every 3 s; emotions bucketed per picture with 0.7 s reaction-lag offset |
+| **REVEAL** | 25 s | Breaking point computed once; DB write; triptych + animated reaction plot |
 
 All durations are tunable in `config.py`.
 
 The processor and installation state are **singletons** — a browser reconnect (page refresh) resumes the same session rather than cold-starting.
+
+### Show mode (presentations)
+
+For live demos in front of an audience there is a **show mode**, toggled with the `◎ SELF / ◉ SHOW` button bottom-right (or `POST /api/mode {"mode": "show"}`). In show mode the hands-raised gesture is bypassed; pressing **Space** or **Enter** (or `POST /api/trigger`) starts a run from IDLE. The `◎ SLIDES` button opens an in-app German presentation deck (`SlidesPhase`) explaining the concept.
 
 ---
 
@@ -97,6 +114,7 @@ GalleryProcessor.push_frame()
 Analysis thread (10 Hz):
   FaceLandmarker   → blendshapes → 7 emotions (FACS weights)
   PoseLandmarker   → wrists above shoulders = hands_raised
+                     (0.4 s grace period before hands count as lowered)
   solvePnP         → head pose — yaw ≤ 35°, pitch ≤ 30° gating
              ↓
 CameraState (thread-safe) read by ws_handler on each frame tick
@@ -110,29 +128,49 @@ MediaPipe models are downloaded once and cached in `/tmp`. The analysis thread s
 
 MediaPipe FaceLandmarker blendshapes (52 FACS action units). No TensorFlow, no DeepFace.
 
-| Emotion | Key blendshapes | Uncanny weight |
-|---------|-----------------|---------------|
-| Disgust | noseSneer, mouthPucker | **+1.0** |
-| Fear | eyeWide + browInnerUp | **+0.9** |
-| Surprise | eyeWide, jawOpen, browOuterUp | +0.4 |
-| Sad | mouthFrown, browInnerUp | +0.2 |
-| Angry | browDown, noseSneer | −0.1 |
-| Neutral | Residual (1.5 baseline) | −0.4 |
-| Happy | mouthSmile, cheekSquint | **−1.0** |
+| Emotion | Key blendshapes |
+|---------|-----------------|
+| Disgust | noseSneer, mouthPucker |
+| Fear | eyeWide + browInnerUp |
+| Surprise | eyeWide, jawOpen, browOuterUp |
+| Sad | mouthFrown, browInnerUp |
+| Angry | browDown, noseSneer |
+| Neutral | Residual (1.5 baseline) |
+| Happy | mouthSmile, cheekSquint |
 
 ---
 
-## Verdict Scoring
+## Breaking-Point Scoring
+
+During BASELINE the average emotion vector is stored as the visitor's **baseline**. During GALLERY each picture gets its own bucket of samples. At reveal time:
 
 ```
-score = Σ(emotion_probability × weight)   normalized to [0, 1]
+deviation(picture k) = Σ over emotions  BREAKING_WEIGHTS[e] × |bucket_avg_k[e] − baseline[e]|
+
+breaking point = argmax k  deviation(k)        (None if max < BREAKING_MIN_DEVIATION)
 ```
 
-| Score | Verdict | Meaning |
-|-------|---------|---------|
-| ≥ 0.60 | **VALLIS** | Fell into the uncanny valley |
-| 0.40–0.60 | **LIMEN** | At the threshold |
-| < 0.40 | **FIRMA** | Stable ground |
+| Emotion | Weight | Rationale |
+|---------|--------|-----------|
+| Disgust | 1.0 | Core uncanny signal |
+| Fear | 0.9 | Threat response |
+| Surprise | 0.7 | Strong involuntary reaction |
+| Angry | 0.6 | Rejection |
+| Sad | 0.5 | Negative shift |
+| Happy | 0.5 | A laugh is also a reaction |
+| Neutral | 0.2 | Mostly absorbs the others' movement |
+
+Any *change* from baseline counts — the weights only decide how much.
+
+### Verdict
+
+| Condition | Verdict | Meaning |
+|-----------|---------|---------|
+| max deviation ≥ 0.25 | **VALLIS** | Strong reaction — fell into the valley |
+| breaking point exists, deviation < 0.25 | **LIMEN** | Measurable but mild — at the threshold |
+| max deviation < 0.08 (no breaking point) | **FIRMA** | Unmoved — *ARS MANSIT*, it never stopped being art |
+
+Thresholds are in `config.py` (`BREAKING_MIN_DEVIATION`, `VERDICT_VALLIS_DEVIATION`) and will need live tuning with real faces.
 
 ---
 
@@ -144,10 +182,11 @@ score = Σ(emotion_probability × weight)   normalized to [0, 1]
 
 ```ts
 {
-  phase: "IDLE" | "INTRO" | "MORPHING" | "RECAP"
+  show_mode: boolean
+  phase: "IDLE" | "BASELINE" | "GALLERY" | "REVEAL"
   phase_elapsed: number        // seconds since phase start
   phase_duration: number       // total duration of current phase
-  phase_started_at: number     // Unix timestamp (seconds)
+  phase_started_at: number     // Unix timestamp (seconds) — frontend animation clock
   attract_mode: boolean        // show attract screen in IDLE
   soul_count: number
   emotions: Record<string, number>   // 0–1 per emotion key
@@ -156,11 +195,20 @@ score = Σ(emotion_probability × weight)   normalized to [0, 1]
   artwork: { slug, title, artist, total_frames } | null
   verdict: "VALLIS" | "LIMEN" | "FIRMA" | ""
   personal_lines: [string, number][]
+  breaking_index: number | null  // 1-based picture where art broke; null = never
+  deviations: number[]           // per-picture deviation from baseline
   collective: { soul_count, dominant_latin, verdict, concordance } | null
-  recap_graph: string | null     // base64 PNG
   attract_graph: string | null   // base64 PNG
 }
 ```
+
+### HTTP endpoints
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/mode` | POST `{"mode": "show" \| "self"}` | Toggle show mode |
+| `/api/trigger` | POST | Start a run from IDLE (show mode only) |
+| `/frames/{slug}/{n:04d}.png` | GET | Artwork pictures (static) |
 
 ---
 
@@ -213,27 +261,32 @@ cd frontend && npm install
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `LOCK_STABILITY_DURATION` | 1.5 s | How long hands must stay raised |
-| `INTRO_DURATION` | 8.0 s | Artwork reveal screen |
-| `MORPHING_DURATION` | 30.0 s | AI degradation animation |
-| `RECAP_DURATION` | 15.0 s | Results display |
+| `BASELINE_DURATION` | 19.0 s | Original + description; baseline calibration |
+| `GALLERY_DURATION` | 30.0 s | 10-picture sequence |
+| `REVEAL_DURATION` | 25.0 s | Triptych verdict + reaction plot |
+| `FRAME_COUNT` | 10 | Pictures per artwork (0000 = original, 0001–0010) |
+| `SECONDS_PER_PICTURE` | 3.0 s | Derived: `GALLERY_DURATION / FRAME_COUNT` |
+| `REACTION_LAG_S` | 0.7 s | Facial reaction delay used for bucket attribution |
+| `BREAKING_WEIGHTS` | see above | Per-emotion deviation weights |
+| `BREAKING_MIN_DEVIATION` | 0.08 | Below this max deviation → FIRMA |
+| `VERDICT_VALLIS_DEVIATION` | 0.25 | Above this max deviation → VALLIS |
 | `ATTRACT_CYCLE_S` | 30 s | Full attract cycle length |
 | `ATTRACT_DURATION_S` | 15 s | Attract screen visible window |
 | `EMOTION_SAMPLE_RATE_HZ` | 10 | Analysis thread target rate |
 | `GAZE_YAW_THRESHOLD_DEG` | 35.0 | Max head yaw to count as engaged |
 | `GAZE_PITCH_THRESHOLD_DEG` | 30.0 | Max head pitch |
 | `MIN_FACE_AREA_FRACTION` | 0.01 | Minimum face bbox area |
-| `VERDICT_VALLIS_THRESHOLD` | 0.60 | Score ≥ this = VALLIS |
-| `VERDICT_FIRMA_THRESHOLD` | 0.40 | Score < this = FIRMA |
-| `FRAME_COUNT` | 50 | Degradation frames per artwork (0000 = original, 0001–0050) |
 
 ---
 
 ## Catalog
 
-Artwork frames live in `../uncanny_maker/catalog_iterations/{slug}/0000–0100.png`.  
+Artwork pictures live in `../uncanny_maker/catalog_iterations_10/{slug}/0000–0010.png`.  
 Original JPGs in `../uncanny_maker/catalog/{slug}.jpg`.
 
-The catalog manager scans those directories on startup and auto-registers artworks in the SQLite database. Round-robin picks the least-viewed artwork for each session.
+The catalog manager scans those directories on startup and auto-registers artworks in the SQLite database. Round-robin picks the least-viewed artwork for each session. An artwork is only loaded when its `0010.png` exists — partially generated sequences are skipped.
+
+Generate the sequences with `uncanny_maker/iterate_degrade.py` (two phases: pictures 1–5 direct from the original, 6–10 chained model collapse; see `../docs/PIPELINE.md`).
 
 ### Resetting data
 
@@ -245,10 +298,10 @@ rm data/gallery.db   # wipe all viewings; DB is recreated on next start
 
 ## Database
 
-SQLite at `data/gallery.db`. Auto-created on first run.
+SQLite at `data/gallery.db`. Auto-created on first run; missing columns are added automatically (`data/db.py:_migrate`).
 
 **artworks** — id, slug, title, artist, year, image_path, description  
-**viewings** — id, artwork_id, session_id, timestamp, duration_seconds, emotion_json, dominant_emotion, verdict, num_faces_in_frame
+**viewings** — id, artwork_id, session_id, timestamp, duration_seconds, emotion_json, dominant_emotion, verdict, num_faces_in_frame, **breaking_index** (1-based picture where art broke; NULL = never)
 
 ---
 
@@ -256,7 +309,7 @@ SQLite at `data/gallery.db`. Auto-created on first run.
 
 **Fonts:** Cinzel (titles), Cormorant Garamond (body), Pinyon Script (flourishes) — Google Fonts  
 **Palette:** Ink black `#1C1410`, parchment `#F4E8D0`, gold `#C9A961`, burgundy `#6B2C2C`  
-**Layout:** `16:9` landscape — camera feed left (58%), info panel right (42%). Letterboxed on non-16:9 screens.  
+**Layout:** `16:9` landscape — camera feed left (58%), info panel right (42%). Letterboxed on non-16:9 screens. The reveal screen is a full-bleed split.  
 **All text sized for projection** — `clamp()` with `vh`-based fluid values; panel never overflows regardless of screen size.
 
 ---

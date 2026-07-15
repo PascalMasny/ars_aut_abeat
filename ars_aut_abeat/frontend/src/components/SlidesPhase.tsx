@@ -24,18 +24,18 @@ const SLIDES = [
   {
     tag: 'DAS EXPERIMENT',
     title: 'Was hier passiert',
-    body: 'Ein klassisches Gemälde wird einer KI übergeben. Sie versucht es 50 Mal neu zu erschaffen — jede Iteration entfernt sich ein Stück weiter vom Original.\n\nGleichzeitig liest eine Kamera dein Gesicht. Deine Emotionen werden in Echtzeit gemessen.',
-    closing: 'Deine Reaktion ist der Datenpunkt.',
+    body: 'Zuerst siehst du das Original — 8 Sekunden lang. Die Kamera liest dein Gesicht und speichert deine Baseline: dein Ausdruck vor echter Kunst.\n\nDann folgen zehn Bilder. Eine KI hat das Gemälde zehn Mal neu erschaffen — jede Iteration entfernt sich weiter vom Original. Alle drei Sekunden ein neues Bild.',
+    closing: 'Deine Abweichung von der Baseline ist der Datenpunkt.',
   },
   {
     tag: 'DAS URTEIL',
-    title: 'Drei Verdikt-Stufen',
+    title: 'Der Bruchpunkt',
     body: null,
     closing: null,
     verdicts: [
-      { label: 'VALLIS', sub: 'Du bist gefallen', desc: 'Starke emotionale Reaktion — Unbehagen, Ekel, Wut. Die KI-Degradierung hat dich berührt.' },
-      { label: 'LIMEN', sub: 'Du stehst an der Schwelle', desc: 'Gemischte Signale. Du spürst etwas — aber bist dir nicht sicher was.' },
-      { label: 'FIRMA', sub: 'Du stehst auf festem Grund', desc: 'Keine messbare Reaktion. Entweder unberührt — oder ein perfektes Pokerface.' },
+      { label: 'DER BRUCHPUNKT', sub: 'Hier stirbt die Kunst', desc: 'Das Bild mit deiner stärksten Reaktion ist dein Bruchpunkt. Das Bild davor: noch Kunst. Ab hier: keine mehr. Du ziehst die Linie — nicht die Maschine.' },
+      { label: 'GEFALLEN · SCHWELLE', sub: 'Wie tief bist du gefallen?', desc: 'Gefallen: starke Reaktion, tief ins Tal gestürzt. Schwelle: messbar, aber mild — du spürst etwas.' },
+      { label: 'UNERSCHÜTTERT', sub: 'Es blieb Kunst', desc: 'Kein Bild hat dich bewegt. Für dich hat es nie aufgehört, Kunst zu sein — oder du hast ein perfektes Pokerface.' },
     ],
   },
   {

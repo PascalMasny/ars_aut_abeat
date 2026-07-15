@@ -16,7 +16,7 @@ export interface Collective {
 
 export interface ServerState {
   show_mode: boolean
-  phase: 'IDLE' | 'INTRO' | 'MORPHING' | 'RECAP'
+  phase: 'IDLE' | 'BASELINE' | 'GALLERY' | 'REVEAL'
   phase_elapsed: number
   phase_duration: number
   phase_started_at: number
@@ -28,8 +28,9 @@ export interface ServerState {
   artwork: Artwork | null
   verdict: string
   personal_lines: [string, number][]
+  breaking_index: number | null
+  deviations: number[]
   collective: Collective | null
-  recap_graph: string | null
   attract_graph: string | null
 }
 
@@ -47,8 +48,9 @@ const DEFAULT_STATE: ServerState = {
   artwork: null,
   verdict: '',
   personal_lines: [],
+  breaking_index: null,
+  deviations: [],
   collective: null,
-  recap_graph: null,
   attract_graph: null,
 }
 

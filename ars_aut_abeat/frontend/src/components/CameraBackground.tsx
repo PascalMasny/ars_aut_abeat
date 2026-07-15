@@ -20,7 +20,7 @@ export function CameraBackground({ onFrame, capturing }: Props) {
   if (error) {
     return (
       <div className="camera-setup">
-        <h1>VALLIS · SIMVLACRI</h1>
+        <h1>THE VALLEY OF LIKENESS</h1>
         <p>Camera access required. Please allow camera permission and reload.</p>
         <p style={{ color: 'var(--gold-dark)', fontSize: '2rem' }}>{error}</p>
       </div>

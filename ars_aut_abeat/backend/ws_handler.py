@@ -11,7 +11,10 @@ from core.state_machine import InstallationState, advance_state, elapsed
 from vision.camera import GalleryProcessor, CameraState
 from catalog.manager import get_catalog_manager
 from data.db import get_session
-from config import ATTRACT_CYCLE_S, ATTRACT_DURATION_S, MORPHING_DURATION, FRAME_COUNT
+from config import (
+    ATTRACT_CYCLE_S, ATTRACT_DURATION_S, FRAME_COUNT,
+    BASELINE_DURATION, GALLERY_DURATION, REVEAL_DURATION,
+)
 
 # ── Singletons shared across all WebSocket connections ───────────────────────
 # One processor: analysis thread and MediaPipe models start once at server
@@ -81,7 +84,7 @@ class GallerySession:
         camera_state = self._processor.get_state()
 
         phase = self._state.phase
-        self._processor.set_emotion_sampling(phase in ("INTRO", "MORPHING"))
+        self._processor.set_emotion_sampling(phase in ("BASELINE", "GALLERY"))
         self._processor.set_pose_sampling(phase == "IDLE")
 
         db = get_session()
@@ -136,11 +139,6 @@ class GallerySession:
 
             attract_graph_b64 = state.attract_graph_b64
 
-        if phase == "RECAP" and state.recap_graph_b64 is None and state.viewer_session:
-            from backend.graphs import recap_graph
-            s = state.viewer_session
-            state.recap_graph_b64 = recap_graph(s.emotion_timestamps, s.emotion_samples)
-
         artwork = None
         if state.current_artwork:
             a = state.current_artwork
@@ -165,7 +163,11 @@ class GallerySession:
             "show_mode":       state.show_mode,
             "phase":           phase,
             "phase_elapsed":   round(t, 2),
-            "phase_duration":  {"INTRO": 8.0, "MORPHING": MORPHING_DURATION, "RECAP": 15.0}.get(phase, 0.0),
+            "phase_duration":  {
+                "BASELINE": BASELINE_DURATION,
+                "GALLERY":  GALLERY_DURATION,
+                "REVEAL":   REVEAL_DURATION,
+            }.get(phase, 0.0),
             "phase_started_at": state.phase_entered_at,
             "attract_mode":    show_attract,
             "soul_count":      soul_count,
@@ -175,7 +177,8 @@ class GallerySession:
             "artwork":         artwork,
             "verdict":         state.personal_verdict,
             "personal_lines":  state.personal_lines,
+            "breaking_index":  state.breaking_index,
+            "deviations":      [round(d, 4) for d in state.deviations],
             "collective":      collective,
-            "recap_graph":     state.recap_graph_b64,
             "attract_graph":   attract_graph_b64,
         }

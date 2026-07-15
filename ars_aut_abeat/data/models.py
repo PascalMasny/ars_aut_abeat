@@ -34,3 +34,4 @@ class Viewing(Base):
     dominant_emotion = Column(String)
     verdict = Column(String)  # 'VALLIS' | 'LIMEN' | 'FIRMA'
     num_faces_in_frame = Column(Integer, default=1)
+    breaking_index = Column(Integer, nullable=True)  # 1-based picture where art broke; NULL = never
