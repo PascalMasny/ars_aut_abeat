@@ -192,7 +192,7 @@ def main():
     new_count = downloaded - already
     print(f"\nDone — {new_count} new images downloaded  "
           f"({downloaded} total in catalog/,  {skipped} skipped)")
-    print(f"Next step: run  python iterate_degrade.py  to generate 100-frame sequences.")
+    print(f"Next step: run  python iterate_degrade.py  to generate 10-picture sequences.")
 
 
 if __name__ == "__main__":

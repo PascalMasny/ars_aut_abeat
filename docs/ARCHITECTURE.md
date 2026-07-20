@@ -119,8 +119,8 @@ The crossfade is kept short (0.7 s) so each picture change still produces a clea
 | `hooks/useCamera.ts` | Wraps `getUserMedia`. Captures at 640×480, 15 fps. Every 100 ms (10 Hz) draws a frame to an off-screen canvas, encodes as JPEG at 70 % quality, passes to caller as a `Blob`. |
 | `components/CameraBackground.tsx` | Always mounted — passes frames to `sendFrame` continuously. Never unmounts between phases, so the camera stream never stops. |
 | `components/IdlePhase.tsx` | Mirror overlay. Shows visitor detection status and hands-raised prompt (or "press Space" in show mode). Switches to attract mode on a 30-second cycle. |
-| `components/BaselinePhase.tsx` | Original painting + title on the left; "MENSVRA ANIMI" calibration text + progress bar on the right. Preloads all 11 pictures during its 8-second window so GalleryPhase starts without stalls. |
-| `components/GalleryPhase.tsx` | Hard-cut picture sequence: `picture = floor(elapsed / 3 s) + 1`, anchored to `phase_started_at` (server timestamp) so it stays in sync across page refreshes. Shows "PICTVRA k / X" in Roman numerals and live emotion bars. |
+| `components/BaselinePhase.tsx` | Original painting + title on the left; "MENSVRA ANIMI" calibration text + progress bar on the right. Preloads all 11 pictures (`0000`–`0010`) during its 19-second window so GalleryPhase starts without stalls. |
+| `components/GalleryPhase.tsx` | Crossfading picture sequence driven by `requestAnimationFrame`: `picture = floor(elapsed / secondsPerPicture) + 1`, anchored to `phase_started_at` (server timestamp) so it stays in sync across page refreshes. The previous picture stays mounted underneath while the new one fades in over it (`.gallery-fade-in`). Shows "PICTURE k / X" and live emotion bars. `secondsPerPicture` is derived client-side as `phase_duration / total_frames`. |
 | `components/RevealPhase.tsx` | The verdict. Breaking point found: triptych — original, picture k−1 stamped **ARS** (gold), picture k stamped **ABEAT** (red) — panels staggered in, then an animated SVG line plot of all 10 deviations with the breaking point marked, caption "HERE, ART DIED FOR YOU", verdict badge. No breaking point: original centred, stamped **ARS MANSIT**, flat plot. |
 | `components/SlidesPhase.tsx` | In-app presentation deck (German) for live demos: uncanny valley, AI & creativity, the experiment, the verdict tiers. Toggled via the SLIDES button; auto-advances every 10 s. |
 | `App.tsx` | Phase router + show-mode controls (SELF/SHOW toggle, SLIDES toggle, Space/Enter trigger listener). |
@@ -188,7 +188,7 @@ interface ServerState {
   hands_raised:    boolean
   artwork:         { slug, title, artist, total_frames } | null
   verdict:         'VALLIS' | 'LIMEN' | 'FIRMA' | ''
-  personal_lines:  [latin_name: string, pct: number][]
+  personal_lines:  [name: string, pct: number][]   // see note on EMOTION_LATIN below
   breaking_index:  number | null  // 1-based picture where art broke; null = ARS MANSIT
   deviations:      number[]       // per-picture deviation scores (10 entries)
   collective:      { soul_count, dominant_latin, verdict, concordance } | null
@@ -197,6 +197,16 @@ interface ServerState {
 ```
 
 Pictures are served as static files: `/frames/{slug}/{n:04d}.png`. The frontend fetches them directly via HTTP — they do not travel through the WebSocket.
+
+> **Naming note — `EMOTION_LATIN` is not Latin.** Both the backend map
+> (`config.py: EMOTION_LATIN`) and its frontend twin
+> (`GalleryPhase.tsx: EMOTION_LATIN`) currently map each emotion key to its plain
+> **English** capitalisation (`happy → "Happy"`). The name is a leftover from an
+> earlier design that displayed Latin emotion names alongside the Latin verdict
+> tiers, and `ServerState.personal_lines` inherited the `latin_name` label from
+> it. The verdicts (VALLIS / LIMEN / FIRMA / ARS / ABEAT) *are* Latin; the emotion
+> labels are not. To restore Latin display, edit these two maps — they are the
+> only place emotion labels are rendered, and they must be kept in sync.
 
 ### HTTP control endpoints (show mode)
 
@@ -211,7 +221,11 @@ Pictures are served as static files: `/frames/{slug}/{n:04d}.png`. The frontend 
 
 ### Blendshape → Emotion Mapping (FACS)
 
-MediaPipe FaceLandmarker returns 52 action-unit scores in `[0, 1]`. These are combined into 7 channels using pre-defined weights from Facial Action Coding System (FACS) research:
+MediaPipe FaceLandmarker returns 52 action-unit scores in `[0, 1]`. **18 of them**
+are mapped to emotion channels (`_BLENDSHAPE_MAP` in `vision/emotion.py`); the
+remaining 34 — eye blinks, gaze direction, tongue, most jaw and cheek shapes —
+are ignored. The 18 are combined into 7 channels using weights derived from
+Facial Action Coding System (FACS) research:
 
 | Emotion | Key blendshapes |
 |---------|-----------------|
@@ -277,6 +291,42 @@ Verdict (thresholds in `config.py`):
 | max deviation ≥ `VERDICT_VALLIS_DEVIATION` (0.25) | VALLIS — fell into the valley |
 | breaking point exists, below VALLIS threshold | LIMEN — at the threshold |
 | max deviation < `BREAKING_MIN_DEVIATION` (0.08) | FIRMA — *ARS MANSIT*, never stopped being art |
+
+---
+
+## Two Verdict Systems (they are not the same)
+
+`VALLIS` / `LIMEN` / `FIRMA` are produced by **two different scorers** depending on
+whether the verdict is personal or collective. They share label names and nothing
+else — different weights, different inputs, different thresholds, different scales.
+Confusing them is the easiest mistake to make when reading this code.
+
+| | Personal verdict | Collective verdict |
+|---|---|---|
+| Function | `verdict_from_deviation()` | `verdict_label()` ← `_score()` |
+| Config weights | `BREAKING_WEIGHTS` (all positive, 0.2–1.0) | `VERDICT_WEIGHTS` (signed, −1.0–1.0) |
+| Input | max per-picture deviation **from this viewer's baseline** | mean emotion vector across **all viewings of the artwork** |
+| Measures | *how much the viewer changed* | *how negative the crowd's average mood is* |
+| Thresholds | `VERDICT_VALLIS_DEVIATION` 0.25 / `BREAKING_MIN_DEVIATION` 0.08 | `VERDICT_VALLIS_THRESHOLD` 0.60 / `VERDICT_FIRMA_THRESHOLD` 0.40 |
+| Written to | `viewings.verdict`, `ServerState.verdict` | `ServerState.collective.verdict` |
+
+The distinction is conceptual, not incidental:
+
+- The **personal** verdict is *change-based and sign-blind*. Every weight is
+  positive, so a visitor who breaks into laughter at picture 7 scores exactly as
+  strong a reaction as one who recoils. The claim is "something moved in you
+  here", not "you were disgusted".
+- The **collective** verdict is *valence-based*. `VERDICT_WEIGHTS` gives
+  `happy: −1.0` and `neutral: −0.4` against `disgust: +1.0` and `fear: +0.9`, and
+  `_score()` maps the weighted sum from `[−1, 1]` into `[0, 1]`. A crowd that
+  mostly smiled lands near FIRMA; a crowd that mostly recoiled lands near VALLIS.
+  With no viewings yet it returns the neutral default `0.5` → LIMEN.
+
+So one artwork can legitimately show a personal `VALLIS` (this visitor reacted
+hard) alongside a collective `FIRMA` (the crowd has mostly found it funny).
+
+`verdict_label()` and `score_emotions()` in `core/verdict.py` are reachable only
+through `collective_summary()`. The personal path never calls them.
 
 ---
 
@@ -353,21 +403,71 @@ The 10-picture format is used when `{slug}/0010.png` exists. Otherwise the legac
 
 ## Configuration Reference (`config.py`)
 
+Complete listing of `ars_aut_abeat/config.py`. Every value is module-level and read
+at import time — changing one requires a server restart.
+
+### Timing
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `LOCK_STABILITY_DURATION` | 1.5 s | Hands must stay raised for this long to trigger |
-| `BASELINE_DURATION` | 19.0 s | Original + description; baseline calibration |
+| `LOCK_STABILITY_DURATION` | 1.5 s | Hands must stay raised this long to trigger IDLE → BASELINE |
+| `BASELINE_DURATION` | 19.0 s | Original + description; baseline calibration window |
 | `GALLERY_DURATION` | 30.0 s | 10-picture sequence |
 | `REVEAL_DURATION` | 25.0 s | Triptych verdict + reaction plot |
-| `FRAME_COUNT` | 10 | Pictures per artwork |
-| `SECONDS_PER_PICTURE` | 3.0 s | Derived: gallery duration / picture count |
+| `LOCKED_TRANSITION_DURATION` | 2.5 s | Unused by the FastAPI app — retired Streamlit path only |
+| `FADE_DURATION` | 3.0 s | Unused by the FastAPI app — CSS owns all transitions |
+| `INTRO_/MORPHING_/RECAP_DURATION` | aliases | Legacy names kept only for the retired `app.py` |
+
+### Pictures
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `FRAME_COUNT` | 10 | Degradation pictures per artwork (plus `0000` = original) |
+| `SECONDS_PER_PICTURE` | 3.0 s | Derived: `GALLERY_DURATION / FRAME_COUNT` |
 | `REACTION_LAG_S` | 0.7 s | Reaction-lag offset for bucket attribution |
-| `BREAKING_WEIGHTS` | see above | Per-emotion deviation weights |
-| `BREAKING_MIN_DEVIATION` | 0.08 | Max deviation below this → FIRMA |
-| `VERDICT_VALLIS_DEVIATION` | 0.25 | Max deviation above this → VALLIS |
-| `ATTRACT_CYCLE_S` | 30 s | Full attract cycle length |
-| `ATTRACT_DURATION_S` | 15 s | Attract screen visible per cycle |
-| `EMOTION_SAMPLE_RATE_HZ` | 10 | Analysis thread target rate |
+| `ITERATIONS_DIRNAME` | `catalog_iterations_10` | Pipeline output dir the app reads |
+| `UNCANNY_OG_DIR` | `../uncanny_maker/catalog` | Source JPEGs — **the catalog scan starts here** |
+| `UNCANNY_ITER_DIR` | `../uncanny_maker/catalog_iterations_10` | Picture sequences, mounted at `/frames` |
+| `UNCANNY_20/60/80_DIR` | `../uncanny_maker/catalog_uncanny/*` | Legacy 4-stage fallback dirs |
+
+### Vision
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `EMOTION_SAMPLE_RATE_HZ` | 10 | Analysis-thread target rate |
 | `GAZE_YAW_THRESHOLD_DEG` | 35.0° | Max head yaw to count as looking at camera |
 | `GAZE_PITCH_THRESHOLD_DEG` | 30.0° | Max head pitch |
 | `MIN_FACE_AREA_FRACTION` | 0.01 | Minimum face bounding-box area (fraction of frame) |
+
+Two vision constants live outside `config.py`:
+`_HANDS_DOWN_GRACE_S` (0.4 s, `vision/camera.py`) and the FaceLandmarker limit
+`num_faces=4` with confidence thresholds of 0.4.
+
+### Personal verdict — breaking point
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `BREAKING_WEIGHTS` | disgust 1.0, fear 0.9, surprise 0.7, angry 0.6, sad 0.5, happy 0.5, neutral 0.2 | Per-emotion deviation weights, all positive |
+| `BREAKING_MIN_DEVIATION` | 0.08 | Max deviation below this → no breaking point → FIRMA |
+| `VERDICT_VALLIS_DEVIATION` | 0.25 | Max deviation above this → VALLIS, between → LIMEN |
+
+### Collective verdict — crowd valence
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `VERDICT_WEIGHTS` | disgust 1.0, fear 0.9, surprise 0.4, sad 0.2, angry −0.1, neutral −0.4, happy −1.0 | Signed valence weights for the crowd score |
+| `VERDICT_VALLIS_THRESHOLD` | 0.60 | Crowd score ≥ this → VALLIS |
+| `VERDICT_FIRMA_THRESHOLD` | 0.40 | Crowd score ≥ this → LIMEN, below → FIRMA |
+
+See [Two Verdict Systems](#two-verdict-systems-they-are-not-the-same) — these two
+blocks are not interchangeable.
+
+### Attract screen & misc
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `ATTRACT_CYCLE_S` | 30 s | Full attract cycle length |
+| `ATTRACT_DURATION_S` | 15 s | Attract screen visible per cycle |
+| `DB_PATH` | `data/gallery.db` | SQLite file, created on first run |
+| `CATALOG_PATH` | `catalog/artworks.json` | Optional seed data, loaded by `_migrate()` if present |
+| `EMOTION_LATIN` | English labels | Display names — see the naming note above |

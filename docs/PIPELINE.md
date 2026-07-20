@@ -31,24 +31,41 @@ iterate_degrade.py  (one run per image)
 
 **Query strategy**
 
-Three searches are issued in sequence:
+30 keyword searches are issued in sequence, each scoped to one Met department and
+carrying its own `pick` quota (`SEARCHES` in `download_human_figures.py`):
 
-| Query | Target |
-|-------|--------|
-| `"figure" AND "classical"` | Greco-Roman sculpture |
-| `"portrait" AND "Renaissance"` | 15th–17th century oil portraits |
-| `"figure" AND "painting"` | Broader figurative paintings |
+| Department | Searches | Examples |
+|------------|----------|----------|
+| 13 — Greek & Roman Art | 12 | `kouros`, `marble statue figure`, `Aphrodite Venus`, `marble portrait bust` |
+| 11 — European Paintings | 18 | `portrait woman`, `Madonna Child`, `Rembrandt portrait`, `Baroque portrait` |
 
-Each result is filtered to artworks that:
-- Have `isPublicDomain = true`
-- Carry a primary image URL
-- Belong to medium categories likely to contain human figures (checked via `medium` field keyword scan)
+Each search runs with `hasImages=true` and `isPublicDomain=true` as API parameters,
+so filtering happens server-side. Results are then sampled with a stride
+(`new[::step][:pick*2]`) to spread picks across the whole result set rather than
+taking the first N, which would over-represent one artist or one acquisition batch.
+
+The only client-side filter is that the object must carry a `primaryImage` or
+`primaryImageSmall` URL. There is **no** medium-keyword scan — the department
+scoping and query wording do that work.
+
+Collection stops at `TARGET = 200` downloaded files.
 
 **Output**
 
-Images are saved as `catalog/<objectID>_<sanitised_title>.jpg`. The script is resumable: if a file matching `*<objectID>*.jpg` already exists in `catalog/`, that object is skipped.
+Images are saved as `catalog/<sanitised_title>_<objectID>.jpg` — title first,
+object ID last (`safe_filename()` truncates the title to 50 chars). That trailing
+ID is what `catalog/manager.py` strips to build display titles, and the full stem
+is what seeds Stable Diffusion.
+
+The script is resumable: an object is skipped if its exact destination filename
+already exists, or if its ID appears as the trailing segment of any `catalog/*.jpg`.
 
 Typical run: ~200 images, runtime depends on network speed.
+
+> **Restoring the exact catalog?** Do not use this script — its index-based
+> sampling of shifting search results produces a different set every time. Use
+> `restore_catalog.py`, which downloads a fixed object-ID list. See
+> [`HOWTO_REGENERATE_CATALOG.md`](HOWTO_REGENERATE_CATALOG.md).
 
 ---
 
@@ -98,18 +115,42 @@ Stable Diffusion's training distribution has a strong prior on what a human look
 
 ### Prompt generation (LLaVA)
 
-Before the iteration loop, the source image is sent to a locally-running LLaVA instance (via Ollama) with the prompt:
+Before the iteration loop, every pending source image is sent to a locally-running
+LLaVA instance (via Ollama) — all prompts are fetched in parallel across a thread
+pool before Stable Diffusion loads, so the GPU never waits on the LLM.
 
-> "Describe this artwork in under 30 words, focusing on the human figure, style, and medium. Write only the description, no preamble."
+The system prompt (`core/llm.py: _SYSTEM_PROMPT`) does **not** ask for a neutral
+description. It asks for a prompt that actively pushes toward the uncanny valley:
 
-The response is used as the Stable Diffusion prompt for all 10 pictures, ensuring that each picture's drift is anchored to the original subject rather than drifting arbitrarily.
+> "You are an expert in the uncanny valley phenomenon. When given an image, you
+> write a concise Stable Diffusion img2img prompt (maximum 30 words,
+> comma-separated tags only, no sentences) that will push the subject toward the
+> uncanny valley: hyperrealistic but subtly wrong — glassy eyes, waxy skin,
+> slightly off proportions, unsettling stillness. Output ONLY the prompt string,
+> nothing else."
 
-**Fallback**: if Ollama is not running, a generic prompt is used:
+The response is truncated to 30 words and used as the Stable Diffusion prompt for
+all 10 pictures of that artwork.
+
+This matters for interpreting results. The degradation is **not** a neutral
+"what does the model do when left alone" experiment: the prompt is a deliberate
+artistic instrument, steering each pass toward waxiness and glassy stillness while
+img2img strength controls how far it gets to act. Two forces produce the final
+pictures — compounding VAE-roundtrip damage (unguided) and the uncanny prompt
+(guided). Anyone reading the visitor data as evidence about model collapse in
+general should know the prompt is on the scale.
+
+**Fallback**: if Ollama is unreachable, `_fetch_prompt()` catches the error and
+substitutes a fixed neutral prompt:
+
 ```
-"a classical painting of a human figure, detailed, oil on canvas"
+"classical painting, human figure, museum artwork, detailed"
 ```
 
-The quality difference between LLaVA-guided and generic prompts is meaningful for figurative paintings but negligible for sculpture photographs.
+Running without Ollama is therefore both fully deterministic and artistically
+different — the collapse still happens, but nothing is steering it toward
+waxy-and-glassy. The difference is clearest on figurative paintings and close to
+invisible on sculpture photographs.
 
 ### Hardware requirements
 
@@ -152,18 +193,24 @@ The directory is excluded from version control (see `.gitignore`). The older 50/
 
 ## Configuration
 
-All tunable parameters are in `uncanny_maker/config.py`:
+`uncanny_maker/config.py` — note that only the first three affect a normal run:
 
 | Parameter | Default | Effect |
 |-----------|---------|--------|
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama server address |
 | `OLLAMA_MODEL` | `llava` | Vision LLM for prompt generation |
 | `SD_MODEL_ID` | `runwayml/stable-diffusion-v1-5` | Diffusion base model |
-| `DEFAULT_STRENGTH` | 0.55 | Per-iteration change magnitude |
-| `DEFAULT_GUIDANCE` | 7.5 | Classifier-free guidance scale |
-| `NEGATIVE_PROMPT` | `"cartoon, anime, ..."` | What to avoid in generation |
+| `DEFAULT_STRENGTH` | 0.55 | **Unused by `iterate_degrade.py`** — it computes strength from its own ramp constants |
+| `DEFAULT_GUIDANCE` | 7.5 | **Unused by `iterate_degrade.py`** — overridden by its local `GUIDANCE = 6.0` |
+| `NEGATIVE_PROMPT` | `"cartoon, anime, painting, …"` | **Unused by `iterate_degrade.py`** — it calls the pipeline without a negative prompt |
 
-In `iterate_degrade.py` itself:
+The bottom three are read only by `core/transform.py: run_img2img()`, a
+single-shot helper used by `test_single.py` and the archived scripts. Editing them
+has no effect on the production pipeline. (`NEGATIVE_PROMPT` also lists `painting`
+as something to avoid, which would work against a catalog of classical paintings —
+another reason the main pipeline does not use it.)
+
+In `iterate_degrade.py` itself — these are the ones that matter:
 
 | Variable | Default | Effect |
 |----------|---------|--------|

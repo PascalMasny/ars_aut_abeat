@@ -124,11 +124,11 @@ Die visuelle Sprache ist bewusst anachronistisch: ein Computer-Vision-Experiment
 
 ## 10 — Weiterführende Dokumente
 
-- [`README.md`](README.md) — technische Übersicht des Repositories
-- [`docs/CONCEPT.md`](docs/CONCEPT.md) — ausführliche philosophische Rahmung
-- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — Systemarchitektur
-- [`docs/PIPELINE.md`](docs/PIPELINE.md) — KI-Degradations-Pipeline
-- [`mockups/`](mockups/) — vollständige Bildersammlung
+- [`README.md`](../README.md) — technische Übersicht des Repositories
+- [`docs/CONCEPT.md`](CONCEPT.md) — ausführliche philosophische Rahmung
+- [`docs/ARCHITECTURE.md`](ARCHITECTURE.md) — Systemarchitektur
+- [`docs/PIPELINE.md`](PIPELINE.md) — KI-Degradations-Pipeline
+- [`mockups/`](../mockups/) — vollständige Bildersammlung
 
 ---
 

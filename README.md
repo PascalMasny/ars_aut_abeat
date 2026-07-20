@@ -75,9 +75,10 @@
 │
 ├── uncanny_maker/          Offline preprocessing pipeline (run once)
 │   ├── iterate_degrade.py  Main script — 10 pictures per artwork (5 direct + 5 chained collapse)
-│   ├── download_human_figures.py  Met Museum API scraper
+│   ├── restore_catalog.py  Re-download the exact 169 artworks from the manifest
+│   ├── download_human_figures.py  Met Museum API scraper (builds a NEW catalog)
 │   ├── core/               Stable Diffusion img2img + LLaVA prompt generation
-│   └── catalog/            Source artwork JPEGs (downloaded by scraper)
+│   └── catalog/            Source artwork JPEGs (git-ignored)
 │
 ├── _prototypes/            Early experiments (not production code)
 └── docs/
@@ -137,14 +138,20 @@ Run once before the installation. Requires a GPU (Apple M-series MPS, NVIDIA CUD
 cd uncanny_maker
 pip install -r requirements.txt
 
-# Step 1 — download ~200 figurative paintings/sculptures from Met Museum Open Access
-python download_human_figures.py
+# Step 1 — get the source artworks. Two options:
+python restore_catalog.py          # restore the exact 169 used in the exhibition
+python download_human_figures.py   # or discover a NEW set from Met Open Access
 
 # Step 2 — generate 10 pictures per image:
 #          1–5 direct from the original (subtle drift), 6–10 chained model collapse
-ollama serve &          # optional — provides better prompts via LLaVA
+ollama serve &          # optional — LLaVA writes the uncanny-steering prompt
 python iterate_degrade.py
 ```
+
+Use `restore_catalog.py` to rebuild *this* catalog: it downloads a fixed list of
+Met object IDs under their original filenames, and since seeds are `crc32(stem)`
+the pictures come back identical. `download_human_figures.py` samples shifting
+search results by index, so it builds a different catalog every time.
 
 Output: `uncanny_maker/catalog_iterations_10/{artwork_slug}/0000.png … 0010.png`
 
@@ -215,12 +222,21 @@ The reveal screen shows the breaking-point picture stamped **ABEAT** (no longer 
 
 ## Documentation
 
-| File | Contents |
-|------|----------|
-| [`docs/CONCEPT.md`](docs/CONCEPT.md) | Philosophy — uncanny valley, model collapse as artistic medium, Freud, Mori |
-| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | System design, WebSocket protocol, vision pipeline, all modules |
-| [`docs/PIPELINE.md`](docs/PIPELINE.md) | Preprocessing pipeline — Stable Diffusion loop, LLaVA, degradation mechanics |
-| [`ars_aut_abeat/README.md`](ars_aut_abeat/README.md) | App-level reference: quick start, config, state machine, DB schema |
+| File | Type | Contents |
+|------|------|----------|
+| [`docs/CONCEPT.md`](docs/CONCEPT.md) | Explanation | Philosophy — uncanny valley, model collapse as artistic medium, Freud, Mori |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Reference | System design, WebSocket protocol, vision pipeline, both verdict systems, full config reference |
+| [`docs/PIPELINE.md`](docs/PIPELINE.md) | Reference | Preprocessing pipeline — Stable Diffusion loop, LLaVA, degradation mechanics |
+| [`docs/HOWTO_RUN_SHOW.md`](docs/HOWTO_RUN_SHOW.md) | How-to | Running the installation at an exhibition; on-site troubleshooting |
+| [`docs/HOWTO_REGENERATE_CATALOG.md`](docs/HOWTO_REGENERATE_CATALOG.md) | How-to | Rebuilding all images from an empty checkout |
+| [`docs/CATALOG_MANIFEST.md`](docs/CATALOG_MANIFEST.md) | Reference | The exact 169 Met artworks the installation was built from |
+| [`ars_aut_abeat/README.md`](ars_aut_abeat/README.md) | Reference | App-level reference: quick start, config, state machine, DB schema |
+
+> **No images in a fresh clone.** The generated pictures (11 GB) and source
+> artworks (362 MB) are excluded from version control. A clone has code and docs
+> only — run [`docs/HOWTO_REGENERATE_CATALOG.md`](docs/HOWTO_REGENERATE_CATALOG.md)
+> before the installation will start. Without a catalog the app runs but stays
+> stuck in IDLE forever.
 
 ---
 
