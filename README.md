@@ -5,6 +5,35 @@
 
 ---
 
+## PLEB Art Consulting
+
+**PLEB Art Consulting** is the four of us — **P**ascal Masny, **L**ukas Kraus,
+**E**rik Reusch, **B**aha Tombul. Systems Engineering B.Sc., Technische Hochschule
+Augsburg.
+
+The name is a joke, and the joke is the thesis.
+
+*Pleb* is short for **plebeian**: in Rome, everyone who wasn't patrician — the
+ordinary people. The word survived into English as something the wealthy say when
+they want to look down on someone. *Plebs.* The masses. People with no taste. We
+are four engineering students who could not tell you why one canvas is worth eight
+figures and the one beside it is worth nothing. By the standards of the art world,
+we are precisely the plebs the word was invented for.
+
+That is the entire point of the installation.
+
+*Vallis Simulacri* does not ask a curator, a critic, or a model where art stops
+being art. It asks whoever happens to be standing in front of the camera — and it
+reads the answer off their face rather than out of their opinion, because a flinch
+cannot be bluffed and doesn't need a vocabulary to be legible. The verdict screen
+says it outright: **you drew this line — not the machine.** Not the expert either.
+
+A consultancy of self-confessed plebs, building an instrument that lets other
+plebs rule on what counts as art. We are unqualified in exactly the way the piece
+requires.
+
+---
+
 ## TL;DR — What this project does (for the confused colleague)
 
 **In one sentence:** Visitors look at a classical painting while their emotional baseline is read, then walk through ten increasingly AI-distorted versions of it; the picture that provokes their strongest reaction becomes the verdict — everything before it was art (**ARS**), from there on it no longer is (**ABEAT**).
